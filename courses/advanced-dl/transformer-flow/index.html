@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tiny Transformer, Step by Step</title>
+<meta name="description" content="An interactive tiny encoder–decoder Transformer: follow the information forward from tokens to loss, the gradient backward to every weight, and watch it learn to reverse a sequence.">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="model.js"></script>
+<script defer src="app.js"></script>
+<style>
+:root{
+  color-scheme: light;
+  --bg:#fcfcfb; --paper:#ffffff; --ink:#1b1b1a; --ink2:#52514e; --muted:#85837d;
+  --line:#e4e2dc; --soft:#f4f3ef; --accent:#2a78d6; --accent-soft:#e3eefb;
+  --q:#2a78d6; --q-soft:#e3eefb; --k:#eb6834; --k-soft:#fde9e0; --v:#1baf7a; --v-soft:#ddf4ea;
+  --enc:#3d6fb6; --enc-soft:#e8eef8; --dec:#6250d6; --dec-soft:#ece9fb;
+  --ffn:#b77d00; --ffn-soft:#fbf1da; --norm:#7a7870; --norm-soft:#efeeea;
+  --grad:#c2378a; --grad-soft:#f8e3ef; --gradneg:#2b9a8f;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:16.5px/1.6 "Charter","Iowan Old Style","Georgia",serif}
+h1,h2,h3,.ui,button,select,input,label,table,.chip,.card,.map,.tok,.readout,.crumbs,.stat{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif}
+a{color:var(--accent)}
+.wrap{max-width:1120px;margin:0 auto;padding:40px 16px 120px}
+.crumbs{font-size:13.5px;color:var(--muted);margin-bottom:22px}
+.crumbs a{color:var(--muted);text-decoration:none}.crumbs a:hover{color:var(--ink)}
+.kicker{font:700 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+h1{font-size:38px;line-height:1.1;margin:0 0 12px;letter-spacing:-.015em}
+.lede{color:var(--ink2);font-size:18px;max-width:760px;margin:0 0 8px}
+h2{font-size:22px;margin:56px 0 6px;display:flex;align-items:baseline;gap:10px}
+h2 .no{font-size:13px;color:var(--paper);background:var(--ink);border-radius:999px;padding:2px 9px;position:relative;top:-2px}
+.sec-lede{color:var(--ink2);max-width:760px;margin:0 0 18px}
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:18px}
+button{font-size:13.5px;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:8px;padding:6px 12px;cursor:pointer}
+button:hover{border-color:#cfccc4;background:var(--soft)}
+button.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+button.primary:hover{background:#333}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ---------- task ---------- */
+.task{display:grid;grid-template-columns:minmax(260px,330px) 1fr;gap:22px;align-items:start}
+.task label{font-size:13px;font-weight:600;display:block;margin-bottom:6px}
+.inrow{display:flex;gap:8px;flex-wrap:wrap}
+.inrow input{font:600 18px "SF Mono",Menlo,monospace;letter-spacing:.2em;width:120px;padding:6px 10px;border:1px solid var(--line);border-radius:8px}
+.inrow input.bad{border-color:#d6492a;background:#fdf0ec}
+.presets{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.presets button{font-family:"SF Mono",Menlo,monospace;padding:3px 9px}
+.hint{font-size:12.5px;color:var(--muted);margin-top:8px;font-family:-apple-system,BlinkMacSystemFont,sans-serif}
+.seqs{display:grid;grid-template-columns:auto 1fr;gap:8px 14px;align-items:center;font-size:13px}
+.seqs .lbl{color:var(--ink2);font-weight:600}
+.toks{display:flex;gap:4px;flex-wrap:wrap}
+.tok{font:600 13px "SF Mono",Menlo,monospace;min-width:42px;text-align:center;padding:4px 6px;border-radius:6px;background:var(--enc-soft);border:1px solid #d3ddf0}
+.tok.pad{background:var(--soft);color:var(--muted);border-color:var(--line)}
+.tok.special{background:#f1eefc;border-color:#ddd6f7}
+.tok.ign{background:transparent;border-style:dashed;color:var(--muted)}
+.tok small{display:block;font-size:9.5px;font-weight:400;color:var(--muted)}
+
+/* ---------- map ---------- */
+.phases{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.phases button{font-weight:600;padding:8px 14px}
+.phases button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.phases button[data-ph="bwd"].on{background:var(--grad);border-color:var(--grad)}
+.phases button[data-ph="upd"].on{background:var(--v);border-color:var(--v)}
+.layout{display:grid;grid-template-columns:300px minmax(0,1fr);gap:18px;align-items:start}
+.layout>*,.train>*,.task>*{min-width:0}
+.map{font-size:12px;position:sticky;top:12px}
+.map .col{border-radius:12px;padding:10px;margin-bottom:12px}
+.map .col.enc{background:var(--enc-soft)}
+.map .col.dec{background:var(--dec-soft)}
+.map .colh{font-weight:700;font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin:0 2px 8px;display:flex;justify-content:space-between}
+.map .enc .colh{color:var(--enc)}.map .dec .colh{color:var(--dec)}
+.gbox{background:var(--paper);border:1px solid rgba(0,0,0,.07);border-left:4px solid var(--norm);border-radius:8px;padding:6px 8px 7px;margin-bottom:6px}
+.gbox.attn{border-left-color:var(--q)}.gbox.cross{border-left-color:var(--k)}.gbox.ffn{border-left-color:var(--ffn)}
+.gbox.in{border-left-color:var(--muted)}.gbox.out{border-left-color:var(--v)}
+.gbox .gt{font-weight:600;font-size:12px;display:flex;justify-content:space-between;gap:6px}
+.gbox .gt small{font-weight:400;color:var(--muted);font-size:11px;text-align:right}
+.chips{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px}
+.chip{font-size:11px;padding:2px 6px;border-radius:5px;border:1px solid var(--line);background:var(--soft);color:var(--ink2);cursor:pointer;line-height:1.3}
+.chip:hover{border-color:var(--ink2)}
+.chip.done{background:var(--q-soft);border-color:#bcd3f2;color:var(--ink)}
+.chip.gdone{background:var(--grad-soft);border-color:#ecbcd8;color:var(--ink)}
+.chip.now{background:var(--ink);color:#fff;border-color:var(--ink)}
+.bwd .chip.now{background:var(--grad);border-color:var(--grad)}
+.mlink{font-size:11px;color:var(--enc);margin:4px 2px 0;font-weight:600}
+.mlink.k{color:var(--k)}
+
+/* ---------- stage ---------- */
+.stagebar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.stagebar input[type=range]{flex:1;min-width:120px;accent-color:var(--ink)}
+.bwd .stagebar input[type=range]{accent-color:var(--grad)}
+.stagebar .cnt{font:600 12.5px -apple-system,sans-serif;color:var(--muted);min-width:70px;text-align:right;font-variant-numeric:tabular-nums}
+.path{font:600 12px -apple-system,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.stitle{font:700 22px/1.25 -apple-system,BlinkMacSystemFont,sans-serif;margin:2px 0 8px}
+.formula{margin:4px 0 8px;overflow-x:auto;overflow-y:hidden;padding:2px 0}
+.note{color:var(--ink2);margin:0 0 6px;max-width:780px}
+.note.extra{font-size:14.5px;background:var(--grad-soft);border-radius:8px;padding:6px 10px;color:var(--ink)}
+.note.star{background:#fff6dd}
+.mats{display:flex;gap:14px;align-items:flex-start;overflow-x:auto;padding:14px 2px 10px;margin-top:6px}
+.glyph{align-self:center;font:700 22px -apple-system,sans-serif;color:var(--muted);padding:0 2px;flex:none}
+.bwd .glyph{color:var(--grad)}
+.card{flex:none;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:8px 8px 6px}
+.card.out{border-color:#bcd3f2;box-shadow:0 0 0 3px var(--q-soft)}
+.bwd .card.out{border-color:#ecbcd8;box-shadow:0 0 0 3px var(--grad-soft)}
+.card.const{opacity:.6}
+.card .ch{display:flex;gap:8px;align-items:baseline;font-size:12.5px;margin:0 2px 6px;white-space:nowrap}
+.card .ch b{font-size:13.5px}
+.card .ch .sh{color:var(--muted);font-variant-numeric:tabular-nums}
+.card .ch .kind{font-size:10.5px;font-weight:600;border-radius:999px;padding:0 7px;background:var(--soft);color:var(--ink2)}
+.card .ch .kind.param{background:var(--ffn-soft);color:#8a5e00}
+.card .ch .kind.grad{background:var(--grad-soft);color:var(--grad)}
+.card .sub{font-size:11px;color:var(--muted);margin:-3px 2px 6px;max-width:280px;white-space:normal}
+table.mx{border-collapse:separate;border-spacing:2px;font:10px/1 "SF Mono",Menlo,Consolas,monospace}
+table.mx th{font:500 9.5px/1 -apple-system,sans-serif;color:var(--muted);padding:0 3px;white-space:nowrap}
+table.mx thead th{height:14px;text-align:center}
+table.mx tbody th{text-align:right;max-width:52px;overflow:hidden;text-overflow:ellipsis}
+table.mx td{width:33px;min-width:33px;height:22px;text-align:center;border-radius:3px;background:var(--soft);color:var(--ink);transition:opacity .12s;cursor:crosshair}
+table.mx td.ninf{background:repeating-linear-gradient(45deg,#e6e4dd 0 3px,#f5f4f0 3px 6px);color:var(--muted)}
+table.mx td.oh1{background:var(--ink);color:#fff}
+table.mx td.oh0{background:var(--soft);color:transparent}
+table.mx td.mk1{background:#ddf4ea;color:#137a55}
+table.mx td.mk0{background:repeating-linear-gradient(45deg,#e6e4dd 0 3px,#f5f4f0 3px 6px);color:var(--muted)}
+.hovering table.mx td:not(.hl){opacity:.22}
+table.mx td.hl{outline:2px solid var(--ink);outline-offset:-1px}
+table.mx td.me{outline:2.5px solid var(--accent);outline-offset:-1px}
+.bwd table.mx td.me{outline-color:var(--grad)}
+table.mx td.sw{animation:pop .4s both}
+@keyframes pop{from{opacity:0;transform:scale(.55)}to{opacity:1;transform:none}}
+.readout{font-size:13px;min-height:42px;padding:8px 12px;background:var(--soft);border-radius:8px;color:var(--ink2);line-height:1.45}
+.readout b{color:var(--ink)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-top:8px;font-family:-apple-system,sans-serif}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{display:inline-block;width:26px;height:10px;border-radius:2px}
+.updctl{display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:13.5px;margin:6px 0 4px}
+.updctl select{font-size:13.5px;padding:5px 8px;border-radius:8px;border:1px solid var(--line)}
+.updctl input[type=range]{accent-color:var(--v)}
+.lossbox{display:flex;gap:18px;flex-wrap:wrap;margin:10px 0 0;font-size:14px}
+.lossbox .stat b{font-size:22px;font-variant-numeric:tabular-nums}
+
+/* ---------- training ---------- */
+.train{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+.tctl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.tctl .speed{font-size:13px;color:var(--ink2);display:flex;gap:6px;align-items:center}
+.stats{display:flex;gap:22px;margin:4px 0 8px;flex-wrap:wrap}
+.stat{font-size:12px;color:var(--muted)}
+.stat b{display:block;font-size:24px;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.2}
+svg.chart{width:100%;height:auto;display:block}
+.scrub{display:flex;gap:10px;align-items:center;font-size:13px;margin-top:10px;flex-wrap:wrap}
+.scrub input{flex:1;min-width:160px;accent-color:var(--ink)}
+.scrub .lbl{font-variant-numeric:tabular-nums;color:var(--ink2);min-width:170px}
+.heat{display:flex;gap:16px;flex-wrap:wrap}
+.heat .card{padding:8px}
+.pred{font-size:14px;margin:4px 0 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.pred .ok{color:var(--v);font-weight:700}.pred .no{color:#d6492a;font-weight:700}
+footer{margin-top:72px;font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:16px;font-family:-apple-system,sans-serif}
+
+@media (max-width:900px){
+  .layout,.train,.task{grid-template-columns:1fr}
+  .map{position:static;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .map .col{margin:0}
+}
+@media (max-width:560px){
+  h1{font-size:30px}.map{grid-template-columns:1fr}
+  .wrap{padding-top:28px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="crumbs"><a href="../../../">Courses</a> / <a href="../">Advanced DL</a> / Tiny Transformer</nav>
+  <div class="kicker">Interactive companion · Transformers</div>
+  <h1>Tiny Transformer, Step by Step</h1>
+  <p class="lede">A complete encoder–decoder Transformer, small enough that every number fits on screen. Follow one sentence forward from tokens to loss, follow the gradient backward to every weight, then train it and watch attention organise itself.</p>
+
+  <h2><span class="no">1</span>The toy task: reverse a sequence</h2>
+  <p class="sec-lede">The model reads up to four letters and must write them backwards, then stop with <code>&lt;/s&gt;</code>. Short inputs are padded, so you will see both kinds of mask at work.</p>
+  <div class="panel task">
+    <div>
+      <label for="inp">Input letters (a–e, 1 to 4 of them)</label>
+      <div class="inrow"><input id="inp" value="abc" maxlength="8" autocomplete="off" spellcheck="false"><button id="rand" type="button">Random</button></div>
+      <div class="presets" id="presets"></div>
+      <div class="hint" id="inhint">Everything below updates when you change this.</div>
+    </div>
+    <div class="seqs" id="seqs"></div>
+  </div>
+
+  <h2><span class="no">2</span>Forward, backward, update</h2>
+  <p class="sec-lede">Step through every operation. <b>Hover any cell</b> to see which cells it was computed from, or which cells it feeds. In the backward pass the same links carry the gradient the other way.</p>
+  <div class="panel" id="stagewrap">
+    <div class="phases" id="phases">
+      <button type="button" data-ph="fwd" class="on">① Forward pass</button>
+      <button type="button" data-ph="bwd">② Backward pass</button>
+      <button type="button" data-ph="upd">③ Weight update</button>
+    </div>
+    <div class="layout">
+      <aside class="map" id="map"></aside>
+      <section id="stage"></section>
+    </div>
+  </div>
+
+  <h2><span class="no">3</span>Train it</h2>
+  <p class="sec-lede">Repeat forward → backward → update on many random sequences (batches of 32, Adam optimiser). The loss drops and the attention maps for <em>your</em> input change from noise into structure. Afterwards, drag the slider to any point in training: section 2 then shows the model as it was at that step.</p>
+  <div class="panel">
+    <div class="tctl">
+      <button type="button" class="primary" id="trainbtn">▶ Train</button>
+      <button type="button" id="step1">+1 step</button>
+      <button type="button" id="resetbtn">Reset weights</button>
+      <label class="speed">Speed <select id="speed"><option value="0.25">slow</option><option value="1" selected>normal</option><option value="4">fast</option></select></label>
+    </div>
+    <div class="train">
+      <div>
+        <div class="stats"><div class="stat">Training step<b id="sStep">0</b></div><div class="stat">Batch loss<b id="sLoss">–</b></div><div class="stat">Token accuracy<b id="sAcc">–</b></div></div>
+        <svg class="chart" id="chart" viewBox="0 0 520 220" role="img" aria-label="Training loss curve"></svg>
+        <div class="scrub"><input type="range" id="scrub" min="0" max="0" value="0" aria-label="Choose training step to view"><span class="lbl" id="scrubLbl">Viewing weights at step 0</span></div>
+      </div>
+      <div>
+        <div class="pred" id="pred"></div>
+        <div class="heat" id="heat"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>Everything runs in your browser: a hand-written forward pass and backward pass, no libraries. d<sub>model</sub> = 8, d<sub>ff</sub> = 16, one attention head, one encoder layer and one decoder layer, post-norm as in the original Transformer. <a href="../transformers/">Back to the Transformers lecture notes →</a></footer>
+</div>
+</body>
+</html>
