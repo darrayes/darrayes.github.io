@@ -36,7 +36,14 @@ code,.mono{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:.88em}
 #toc .brand{font-weight:700;font-size:15px;margin:0 6px 4px}
 #toc .sub{color:var(--muted);margin:0 6px 14px;font-size:12.5px}
 #toc input{width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:12px;font-size:13px;background:var(--bg)}
-#toc .ptitle{margin:16px 6px 6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+#toc .ptitle{display:flex;align-items:center;gap:6px;width:100%;margin:12px 0 4px;padding:5px 6px;border:0;border-radius:6px;background:none;cursor:pointer;text-align:left;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+#toc .ptitle:hover{background:var(--soft);color:var(--ink)}
+#toc .ptitle:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+#toc .ptitle .chev{display:inline-block;width:10px;font-size:10px;transition:transform .15s}
+#toc .pgroup.closed .chev{transform:rotate(-90deg)}
+#toc .pgroup.closed .pitems{display:none}
+#toc .filtering .pgroup.closed .pitems{display:block}
+#toc .pgroup.closed.has-on .ptitle{color:var(--accent)}
 #toc a{display:flex;gap:8px;padding:4px 6px;border-radius:6px;color:var(--ink2);text-decoration:none}
 #toc a:hover{background:var(--soft);color:var(--ink)}
 #toc a.on{background:var(--q-soft);color:var(--ink);font-weight:600}
@@ -1793,18 +1800,29 @@ function renderStageMaps(){document.querySelectorAll("[data-stage]").forEach(el=
    Page chrome: table of contents, scroll-spy, progress bar, filter
    ===================================================================== */
 function buildTOC(){
-  const list=document.getElementById("toclist");let h="";
+  const list=document.getElementById("toclist");let h="",open=false,gi=0;
   document.querySelectorAll(".wrap > .part, .wrap section.byte").forEach(n=>{
-    if(n.classList.contains("part")){h+=`<div class="ptitle">${n.dataset.short}</div>`;return;}
+    if(n.classList.contains("part")){if(open)h+=`</div></div>`;
+      h+=`<div class="pgroup" data-g="${gi++}"><button type="button" class="ptitle" aria-expanded="true"><span class="chev">▾</span>${n.dataset.short}</button><div class="pitems">`;open=true;return;}
     const num=n.querySelector("h2 .num"),title=n.querySelector("h2 .tt").textContent;
     h+=`<a href="#${n.id}" class="${n.classList.contains("extra")?"extra":""}"><span class="n">${num?num.textContent:""}</span><span>${title}</span></a>`;});
+  if(open)h+=`</div></div>`;
   list.innerHTML=h;
-  const links=[...list.querySelectorAll("a")];
-  list.onclick=e=>{if(e.target.closest("a"))document.body.classList.remove("menu-open");};
-  document.getElementById("tocq").oninput=e=>{const q=e.target.value.toLowerCase();links.forEach(a=>a.style.display=a.textContent.toLowerCase().includes(q)?"":"none");};
+  const links=[...list.querySelectorAll("a")],groups=[...list.querySelectorAll(".pgroup")];
+  const KEY="toc-collapsed:"+location.pathname;let saved=[];
+  try{saved=JSON.parse(localStorage.getItem(KEY)||"[]");}catch(e){}
+  const setG=(g,c)=>{g.classList.toggle("closed",c);g.querySelector(".ptitle").setAttribute("aria-expanded",String(!c));};
+  const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(groups.filter(g=>g.classList.contains("closed")).map(g=>g.dataset.g)));}catch(e){}};
+  groups.forEach(g=>setG(g,saved.includes(g.dataset.g)));
+  list.onclick=e=>{const t=e.target.closest(".ptitle");
+    if(t){const g=t.parentNode;setG(g,!g.classList.contains("closed"));save();return;}
+    if(e.target.closest("a"))document.body.classList.remove("menu-open");};
+  document.getElementById("tocq").oninput=e=>{const q=e.target.value.toLowerCase();links.forEach(a=>a.style.display=a.textContent.toLowerCase().includes(q)?"":"none");
+    list.classList.toggle("filtering",!!q);
+    groups.forEach(g=>g.style.display=!q||[...g.querySelectorAll("a")].some(a=>a.style.display!=="none")?"":"none");};
   const secs=links.map(a=>document.querySelector(a.getAttribute("href")));
   const bar=document.querySelector("#progress div");
-  const spy=()=>{let cur=0;secs.forEach((s,i)=>{if(s.getBoundingClientRect().top<120)cur=i;});links.forEach((a,i)=>a.classList.toggle("on",i===cur));
+  const spy=()=>{let cur=0;secs.forEach((s,i)=>{if(s.getBoundingClientRect().top<120)cur=i;});links.forEach((a,i)=>a.classList.toggle("on",i===cur));groups.forEach(g=>g.classList.toggle("has-on",!!g.querySelector("a.on")));
     const d=document.documentElement;bar.style.width=(100*d.scrollTop/(d.scrollHeight-d.clientHeight))+"%";};
   addEventListener("scroll",spy,{passive:true});spy();
   let lastOn=null;setInterval(()=>{const a=list.querySelector("a.on");if(a&&a!==lastOn){lastOn=a;const r=a.getBoundingClientRect(),tr=document.getElementById("toc").getBoundingClientRect();if(r.top<tr.top+40||r.bottom>tr.bottom-20)a.scrollIntoView({block:"center"});}},400);
