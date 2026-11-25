@@ -1,0 +1,3860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dynamic Programming Glass-Box Workbench</title>
+<style>
+  /* ==========================================================================
+     1. DESIGN TOKENS & SYSTEM FONT STACKS (ZERO EXTERNAL DEPENDENCIES)
+     ========================================================================== */
+  :root {
+    --bg-page: #F6F8FA;
+    --bg-card: #FFFFFF;
+    --bg-subtle: #F3F4F6;
+    --border: #D0D7DE;
+    --border-strong: #AFB8C1;
+    --ink: #1F2328;
+    --muted: #57606A;
+    --radius: 10px;
+    --radius-sm: 6px;
+    --shadow-sm: 0 1px 2px rgba(31, 35, 40, 0.05);
+    --shadow-md: 0 4px 12px rgba(31, 35, 40, 0.08);
+
+    /* Semantic Color Coding */
+    --c-reward: #0969DA;
+    --bg-reward: #EFF6FF;
+    --bd-reward: #BFDBFE;
+
+    --c-prob: #B45309;
+    --bg-prob: #FFFBEB;
+    --bd-prob: #FDE68A;
+
+    --c-val: #059669;
+    --bg-val: #ECFDF5;
+    --bd-val: #A7F3D0;
+
+    --c-pol: #7C3AED;
+    --bg-pol: #F5F3FF;
+    --bd-pol: #DDD6FE;
+
+    --c-fresh: #0F766E;
+    --bg-fresh: #CCFBF1;
+    --bd-fresh: #5EEAD4;
+
+    --c-danger: #CF222E;
+    --bg-danger: #FFEBE9;
+    --bd-danger: #FF8182;
+
+    --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-math: "Cambria Math", Georgia, "Times New Roman", serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg-page);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ==========================================================================
+     2. TOP CONTROL BAR & NAVIGATION TABS
+     ========================================================================== */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .topbar-inner {
+    max-width: 1420px;
+    margin: 0 auto;
+    padding: 12px 20px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .brand-badge {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #0969DA, #7C3AED);
+    color: #fff;
+    font-family: var(--font-math);
+    font-weight: 700;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .brand h1 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+  }
+
+  .brand p {
+    margin: 0;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .global-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .ctrl-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-page);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 5px 10px;
+    font-size: 12.5px;
+  }
+
+  .ctrl-group label {
+    font-weight: 600;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  select, input[type="number"], input[type="text"] {
+    font-family: var(--font-ui);
+    font-size: 12.5px;
+    color: var(--ink);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 7px;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  select:focus, input:focus {
+    border-color: var(--c-reward);
+    box-shadow: 0 0 0 2px rgba(9, 105, 218, 0.15);
+  }
+
+  .gamma-val {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    color: var(--c-reward);
+    min-width: 34px;
+    text-align: right;
+  }
+
+  input[type="range"] {
+    accent-color: var(--c-reward);
+    cursor: pointer;
+    width: 96px;
+  }
+
+  /* Toggle Switch */
+  .switch-wrap {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .switch {
+    position: relative;
+    width: 34px;
+    height: 19px;
+    background: #CBD5E1;
+    border-radius: 999px;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+
+  .switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    transition: transform 0.2s;
+  }
+
+  .switch-input { display: none; }
+  .switch-input:checked + .switch { background: var(--c-pol); }
+  .switch-input:checked + .switch::after { transform: translateX(15px); }
+
+  /* Tabs Strip */
+  .tabs-bar {
+    background: #FFFFFF;
+    border-top: 1px solid #EAECEF;
+  }
+
+  .tabs-inner {
+    max-width: 1420px;
+    margin: 0 auto;
+    padding: 0 20px;
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .tab-btn {
+    appearance: none;
+    border: none;
+    background: transparent;
+    padding: 10px 14px;
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    border-bottom: 2.5px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+
+  .tab-btn:hover {
+    color: var(--ink);
+    background: var(--bg-page);
+  }
+
+  .tab-btn.active {
+    color: var(--c-reward);
+    border-bottom-color: var(--c-reward);
+  }
+
+  /* ==========================================================================
+     3. MAIN LAYOUT, CARDS, BUTTONS & SEMANTIC BADGES
+     ========================================================================== */
+  .main-wrap {
+    max-width: 1420px;
+    margin: 0 auto;
+    padding: 18px 20px 44px;
+  }
+
+  .legend-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding: 8px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 12px;
+  }
+
+  .legend-title {
+    font-weight: 700;
+    color: var(--muted);
+    margin-right: 4px;
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 11.5px;
+    border: 1px solid transparent;
+  }
+
+  .pill-reward { color: var(--c-reward); background: var(--bg-reward); border-color: var(--bd-reward); }
+  .pill-prob   { color: var(--c-prob);   background: var(--bg-prob);   border-color: var(--bd-prob); }
+  .pill-val    { color: var(--c-val);    background: var(--bg-val);    border-color: var(--bd-val); }
+  .pill-pol    { color: var(--c-pol);    background: var(--bg-pol);    border-color: var(--bd-pol); }
+  .pill-fresh  { color: var(--c-fresh);  background: var(--bg-fresh);  border-color: var(--bd-fresh); }
+  .pill-danger { color: var(--c-danger); background: var(--bg-danger); border-color: var(--bd-danger); }
+  .pill-muted  { color: var(--muted);    background: var(--bg-subtle); border-color: var(--border); }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+
+  .grid-2-eq {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+
+  @media (max-width: 1020px) {
+    .grid-2, .grid-2-eq { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .card:last-child { margin-bottom: 0; }
+
+  .card-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding-bottom: 9px;
+    border-bottom: 1px solid #EAECEF;
+  }
+
+  .card-title {
+    margin: 0;
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .card-sub {
+    margin: 2px 0 0;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn {
+    appearance: none;
+    border: 1px solid var(--border);
+    background: #FFFFFF;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: all 0.14s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .btn:hover:not(:disabled) {
+    background: var(--bg-page);
+    border-color: var(--border-strong);
+  }
+
+  .btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .btn-primary {
+    background: var(--c-reward);
+    border-color: var(--c-reward);
+    color: #fff;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: #0550AE;
+    border-color: #0550AE;
+  }
+
+  .btn-purple {
+    background: var(--c-pol);
+    border-color: var(--c-pol);
+    color: #fff;
+  }
+
+  .btn-purple:hover:not(:disabled) {
+    background: #6D28D9;
+    border-color: #6D28D9;
+  }
+
+  .btn-green {
+    background: var(--c-val);
+    border-color: var(--c-val);
+    color: #fff;
+  }
+
+  .btn-green:hover:not(:disabled) {
+    background: #047857;
+    border-color: #047857;
+  }
+
+  .btn-sm {
+    padding: 4px 8px;
+    font-size: 11.5px;
+  }
+
+  .segmented {
+    display: inline-flex;
+    background: var(--bg-page);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 2px;
+    gap: 2px;
+  }
+
+  .seg-btn {
+    appearance: none;
+    border: none;
+    background: transparent;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+  .seg-btn.active {
+    background: #fff;
+    color: var(--ink);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .seg-btn.active-purple {
+    background: var(--c-pol);
+    color: #fff;
+  }
+
+  .banner-error {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: var(--bg-danger);
+    border: 1px solid var(--bd-danger);
+    color: var(--c-danger);
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    margin-bottom: 14px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .callout {
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 12.5px;
+    border: 1px solid var(--border);
+    background: var(--bg-page);
+  }
+
+  .callout-blue   { background: var(--bg-reward); border-color: var(--bd-reward); color: #1E3A8A; }
+  .callout-purple { background: var(--bg-pol);    border-color: var(--bd-pol);    color: #4C1D95; }
+  .callout-green  { background: var(--bg-val);    border-color: var(--bd-val);    color: #065F46; }
+  .callout-amber  { background: var(--bg-prob);   border-color: var(--bd-prob);   color: #78350F; }
+
+  /* ==========================================================================
+     4. TABLES & MATH TYPOGRAPHY
+     ========================================================================== */
+  .math {
+    font-family: var(--font-math);
+    font-size: 1.04em;
+  }
+
+  .mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tbl-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+  }
+
+  th, td {
+    padding: 7px 9px;
+    border-bottom: 1px solid #EAECEF;
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  th {
+    background: #F8FAFC;
+    color: var(--muted);
+    font-weight: 700;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  .num-cell {
+    font-family: var(--font-mono);
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  tr.clickable-row { cursor: pointer; transition: background 0.12s; }
+  tr.clickable-row:hover td { background: #F8FAFC; }
+  tr.row-selected td { background: #EFF6FF !important; }
+  tr.row-updating td { background: #F5F3FF !important; }
+
+  .cell-reward { background: var(--bg-reward); color: var(--c-reward); font-weight: 600; }
+  .cell-prob   { background: var(--bg-prob);   color: var(--c-prob);   font-weight: 600; }
+  .cell-val    { background: var(--bg-val);    color: var(--c-val);    font-weight: 700; }
+  .cell-pol    { background: var(--bg-pol);    color: var(--c-pol);    font-weight: 700; }
+  .cell-fresh  { background: var(--bg-fresh);  color: var(--c-fresh);  font-weight: 700; }
+
+  .input-num {
+    width: 66px;
+    font-family: var(--font-mono);
+    text-align: right;
+    padding: 4px 6px;
+  }
+
+  .input-reward { border-color: var(--bd-reward); background: var(--bg-reward); color: var(--c-reward); font-weight: 600; }
+  .input-prob   { border-color: var(--bd-prob);   background: var(--bg-prob);   color: var(--c-prob);   font-weight: 600; }
+
+  /* Semantic inline token boxes inside Glass-Box Inspector */
+  .tok {
+    display: inline-block;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 12.5px;
+    border: 1px solid transparent;
+  }
+  .tok-r     { color: var(--c-reward); background: var(--bg-reward); border-color: var(--bd-reward); }
+  .tok-p     { color: var(--c-prob);   background: var(--bg-prob);   border-color: var(--bd-prob); }
+  .tok-v     { color: var(--c-val);    background: var(--bg-val);    border-color: var(--bd-val); }
+  .tok-pol   { color: var(--c-pol);    background: var(--bg-pol);    border-color: var(--bd-pol); }
+  .tok-fresh { color: var(--c-fresh);  background: var(--bg-fresh);  border-color: var(--bd-fresh); }
+
+  /* Glass-Box Equation Inspector */
+  .eq-banner {
+    background: #F8FAFC;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-family: var(--font-math);
+    font-size: 15px;
+    text-align: center;
+    margin-bottom: 12px;
+    overflow-x: auto;
+  }
+
+  .branch-box {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    background: #FFFFFF;
+  }
+
+  .branch-box.branch-active {
+    border-color: var(--c-pol);
+    background: #FCFAFF;
+  }
+
+  .branch-box.branch-zero {
+    opacity: 0.65;
+    background: #FAFAFB;
+  }
+
+  .branch-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 12.5px;
+    font-weight: 700;
+  }
+
+  .formula-line {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.9;
+    word-break: break-word;
+  }
+
+  .reduction-steps {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border);
+    display: grid;
+    gap: 5px;
+    font-size: 12.5px;
+  }
+
+  .red-step {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 8px;
+    background: var(--bg-page);
+    border-radius: 6px;
+  }
+
+  .red-step-final {
+    background: var(--bg-val);
+    border: 1px solid var(--bd-val);
+    font-weight: 700;
+  }
+
+  /* Quiz Box */
+  .quiz-box {
+    background: var(--bg-pol);
+    border: 1.5px solid var(--c-pol);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 10px;
+  }
+
+  .quiz-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  /* ==========================================================================
+     5. VISUAL MATRIX EQUATION DISPLAY (TAB 3 & TAB 4 DIFF)
+     ========================================================================== */
+  .matrix-eq-stage {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 16px 10px;
+    background: #FAFBFD;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow-x: auto;
+  }
+
+  .mat-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .mat-label {
+    font-family: var(--font-math);
+    font-weight: 700;
+    font-size: 13.5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .shape-tag {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--muted);
+    background: #EAECEF;
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  .mat-bracket {
+    position: relative;
+    padding: 4px 6px;
+    border-left: 2px solid var(--ink);
+    border-right: 2px solid var(--ink);
+    border-radius: 6px;
+    background: #fff;
+  }
+
+  .mat-grid {
+    display: grid;
+    gap: 3px;
+  }
+
+  .mat-cell {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 4px 7px;
+    text-align: right;
+    border-radius: 4px;
+    min-width: 56px;
+    transition: background 0.12s, transform 0.12s;
+  }
+
+  .mat-cell.hl-row {
+    outline: 2px solid var(--c-pol);
+    background: var(--bg-pol) !important;
+    color: var(--c-pol) !important;
+    font-weight: 700;
+  }
+
+  .mat-cell.hl-vec {
+    outline: 1.5px solid var(--c-val);
+    background: var(--bg-val) !important;
+    color: var(--c-val) !important;
+    font-weight: 700;
+  }
+
+  .mat-op {
+    font-family: var(--font-math);
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--muted);
+    padding: 0 2px;
+  }
+
+  /* KPI Strip */
+  .kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .kpi-box {
+    background: var(--bg-page);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+
+  .kpi-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .kpi-val {
+    font-family: var(--font-mono);
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-top: 2px;
+  }
+
+  /* SVG Containers */
+  .svg-stage {
+    width: 100%;
+    background: #FAFBFD;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .svg-stage svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .policy-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--bg-pol);
+    border: 1px solid var(--bd-pol);
+    border-radius: 8px;
+    margin-bottom: 12px;
+  }
+
+  .policy-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #fff;
+    padding: 4px 8px;
+    border-radius: 7px;
+    border: 1px solid var(--bd-pol);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .q-clickable {
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .q-clickable:hover {
+    outline: 2px solid var(--c-reward);
+    outline-offset: -2px;
+  }
+
+  details.derivation-box {
+    background: #FAFBFD;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+  }
+
+  details.derivation-box summary {
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--c-reward);
+  }
+
+  .deriv-list {
+    margin: 10px 0 0;
+    padding-left: 18px;
+    font-size: 12.5px;
+    display: grid;
+    gap: 6px;
+  }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div style="background:#1f2328;color:#d0d7de;font:12.5px/1 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:8px 20px;display:flex;gap:16px;flex-wrap:wrap">
+<a href="../" style="color:#fff;text-decoration:none">&larr; Deep Reinforcement Learning</a>
+<a href="../dynamic-programming/" style="color:#9ecbff;text-decoration:none">Lecture notes: Dynamic Programming</a>
+<a href="../mdp-bellman/" style="color:#9ecbff;text-decoration:none">Lecture notes: MDPs &amp; Bellman</a>
+</div>
+
+<!-- ========================================================================
+     TOP CONTROL BAR
+     ======================================================================== -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="brand-badge">V<sup>π</sup></div>
+      <div>
+        <h1>Dynamic Programming Glass-Box Workbench</h1>
+        <p>Interactive MDP &amp; Dynamic Programming Studio</p>
+      </div>
+    </div>
+
+    <div class="global-controls">
+      <div class="ctrl-group">
+        <label for="presetSelect">Preset MDP:</label>
+        <select id="presetSelect">
+          <option value="drone">Autonomous Delivery Drone (3s, 2a, γ=0.8)</option>
+          <option value="robot">Recycling Robot (2s, 2a, γ=0.9)</option>
+          <option value="corridor">Slippery 4-State Corridor (4s, 2a, γ=0.9)</option>
+        </select>
+      </div>
+
+      <div class="ctrl-group" title="Drag discount factor γ to observe value contraction and optimal policy flips">
+        <label for="gammaSlider">Discount <span class="math">γ</span>:</label>
+        <input type="range" id="gammaSlider" min="0" max="0.95" step="0.05" value="0.80">
+        <span id="gammaDisplay" class="gamma-val">0.80</span>
+      </div>
+
+      <div class="ctrl-group">
+        <label for="thetaSelect">Tolerance <span class="math">θ</span>:</label>
+        <select id="thetaSelect">
+          <option value="1e-2">10⁻² (0.01)</option>
+          <option value="1e-4">10⁻⁴ (0.0001)</option>
+          <option value="1e-6" selected>10⁻⁶ (0.000001)</option>
+        </select>
+      </div>
+
+      <div class="ctrl-group" title="Pause before revealing state updates so you can calculate V(s) by hand">
+        <label class="switch-wrap">
+          <input type="checkbox" id="quizToggle" class="switch-input">
+          <span class="switch"></span>
+          <span>Predict-It Quiz Mode</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5-Tab Navigation Bar -->
+  <nav class="tabs-bar" aria-label="Workbench Sections">
+    <div class="tabs-inner" id="tabButtons">
+      <button class="tab-btn active" data-tab="tab1">1. MDP Designer &amp; Graph</button>
+      <button class="tab-btn" data-tab="tab2">2. Policy Evaluation (Sync vs. In-Place)</button>
+      <button class="tab-btn" data-tab="tab3">3. Vectorized Matrix View</button>
+      <button class="tab-btn" data-tab="tab4">4. Policy Iteration (Control)</button>
+      <button class="tab-btn" data-tab="tab5">5. Value Iteration &amp; Algorithm Race</button>
+    </div>
+  </nav>
+</header>
+
+<!-- ========================================================================
+     MAIN WORKSPACE
+     ======================================================================== -->
+<main class="main-wrap">
+
+  <!-- Semantic Color Legend -->
+  <div class="legend-bar">
+    <span class="legend-title">Glass-Box Color Key:</span>
+    <span class="pill pill-reward">Rewards R(s, a)</span>
+    <span class="pill pill-prob">Transitions P(s′ | s, a)</span>
+    <span class="pill pill-val">Values V<sub>k</sub>(s)</span>
+    <span class="pill pill-pol">Policy π / Greedy argmax</span>
+    <span class="pill pill-fresh">FRESH (In-Place Same-Sweep Update)</span>
+  </div>
+
+  <!-- Validation Warning Banner (Shown if any P row sum != 1) -->
+  <div id="validationBanner" class="banner-error hidden">
+    <span id="validationText">Invalid transition probabilities detected.</span>
+    <div class="btn-row">
+      <button class="btn btn-sm" id="btnFixNormalizeAll">Normalize All Invalid Rows</button>
+      <button class="btn btn-sm" id="btnJumpDesigner">Go to MDP Designer</button>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       TAB 1: MDP DESIGNER & INTERACTIVE SVG GRAPH
+       ====================================================================== -->
+  <section id="tab1" class="tab-panel active">
+    <div class="grid-2">
+      <!-- Left: Editable MDP Tables -->
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">MDP Structure &amp; Labels</h2>
+              <p class="card-sub">Edit states (2–5), actions (2–3), immediate rewards, and transition probabilities.</p>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-sm" id="btnAddState">+ State</button>
+              <button class="btn btn-sm" id="btnRemState">− State</button>
+              <button class="btn btn-sm" id="btnAddAction">+ Action</button>
+              <button class="btn btn-sm" id="btnRemAction">− Action</button>
+              <button class="btn btn-sm btn-primary" id="btnResetPreset">Reset Preset</button>
+            </div>
+          </div>
+
+          <div class="grid-2-eq" style="margin-bottom:14px;">
+            <div>
+              <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px;">STATES (S)</div>
+              <div id="stateNameInputs" style="display:grid;gap:6px;"></div>
+            </div>
+            <div>
+              <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px;">ACTIONS (A)</div>
+              <div id="actionNameInputs" style="display:grid;gap:6px;"></div>
+            </div>
+          </div>
+
+          <div style="font-size:12px;font-weight:700;color:var(--c-reward);margin-bottom:6px;">
+            IMMEDIATE REWARDS R(s, a)
+          </div>
+          <div class="tbl-wrap" id="rewardTableContainer"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Transition Probability Tables <span class="math">P(s′ | s, a)</span></h2>
+              <p class="card-sub">Probability Axiom: every row must sum to 1.00 with non-negative entries.</p>
+            </div>
+            <div class="segmented" id="designerActionTabs"></div>
+          </div>
+          <div class="tbl-wrap" id="probTableContainer"></div>
+        </div>
+      </div>
+
+      <!-- Right: Interactive State-Transition Graph -->
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Live State-Transition Diagram</h2>
+              <p class="card-sub">Click any state node to highlight its outgoing transitions and inspect its dynamics.</p>
+            </div>
+            <div class="segmented" id="graphActionFilter"></div>
+          </div>
+          <div class="svg-stage" id="designerGraphStage"></div>
+          <div id="designerNodeSummary" class="callout callout-blue" style="margin-top:12px;"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================================
+       TAB 2: POLICY EVALUATION (SYNCHRONOUS VS. IN-PLACE)
+       ====================================================================== -->
+  <section id="tab2" class="tab-panel">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Policy Evaluation (Prediction): Grading a Frozen Policy <span class="math">π</span></h2>
+          <p class="card-sub">Step one state at a time to see Synchronous (Two-Array) vs. In-Place (One-Array) backups in action.</p>
+        </div>
+        <div class="segmented" id="evalModeToggle">
+          <button class="seg-btn active" data-mode="sync">Synchronous (Two-Array)</button>
+          <button class="seg-btn" data-mode="inplace">In-Place (One-Array)</button>
+        </div>
+      </div>
+
+      <!-- Frozen Policy Picker -->
+      <div class="policy-bar" id="evalPolicyBar"></div>
+
+      <!-- Step Controls -->
+      <div class="btn-row" style="justify-content:space-between;">
+        <div class="btn-row">
+          <button class="btn btn-purple" id="btnEvalStepState">Step 1 State (Micro-Step)</button>
+          <button class="btn btn-primary" id="btnEvalStepSweep">Step 1 Full Sweep (k → k+1)</button>
+          <button class="btn btn-green" id="btnEvalRunAll">Run to Convergence</button>
+          <button class="btn" id="btnEvalReset">Reset V₀ = 0</button>
+        </div>
+        <div id="evalStatusBadge"></div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <!-- Left: Graph + Live Value Table -->
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Live Value Map &amp; Active Policy Graph</h2>
+            <span class="pill pill-muted">Click any state to inspect</span>
+          </div>
+          <div class="svg-stage" id="evalGraphStage"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">State-Value Table <span class="math">V<sub>k</sub>(s)</span></h2>
+            <span id="evalSweepCounter" class="pill pill-val">Sweep k = 0</span>
+          </div>
+          <div class="kpi-strip" id="evalKpis"></div>
+          <div class="tbl-wrap" id="evalValueTable"></div>
+        </div>
+      </div>
+
+      <!-- Right: Glass-Box Equation Inspector -->
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Glass-Box Equation Inspector</h2>
+              <p class="card-sub" id="evalInspectorSubtitle">Live color-coded Bellman Expectation arithmetic.</p>
+            </div>
+            <div class="btn-row" id="evalInspectStatePills"></div>
+          </div>
+          <div id="evalGlassBox"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom: Contraction Chart -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Max-Norm Contraction Chart: <span class="math">Δ<sub>k</sub> = ‖V<sub>k</sub> − V<sub>k−1</sub>‖<sub>∞</sub></span></h2>
+          <p class="card-sub">Compares observed sweep change Δ<sub>k</sub> against the theoretical γ-contraction envelope γ<sup>k−1</sup>Δ<sub>1</sub> and tolerance θ.</p>
+        </div>
+        <div class="segmented" id="evalChartScale">
+          <button class="seg-btn active" data-scale="linear">Linear Y</button>
+          <button class="seg-btn" data-scale="log">Log₁₀ Y</button>
+        </div>
+      </div>
+      <div class="svg-stage" id="evalChartStage"></div>
+    </div>
+  </section>
+
+  <!-- ======================================================================
+       TAB 3: VECTORIZED MATRIX VIEW
+       ====================================================================== -->
+  <section id="tab3" class="tab-panel">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Vectorized Synchronous Policy Evaluation: <span class="math">v<sub>k+1</sub> = r<sup>π</sup> + γ P<sup>π</sup> v<sub>k</sub></span></h2>
+          <p class="card-sub">Hover over any state row below to trace the exact matrix-vector dot product across r<sup>π</sup>, P<sup>π</sup>, and v<sub>k</sub>.</p>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btnVecStep">Step Sweep (k → k+1)</button>
+          <button class="btn btn-green" id="btnVecRun">Run to Convergence</button>
+          <button class="btn" id="btnVecReset">Reset v₀ = 0</button>
+        </div>
+      </div>
+
+      <div class="policy-bar" id="vecPolicyBar"></div>
+
+      <details class="derivation-box">
+        <summary>5-Step Algebraic Derivation Recap (Scalar Bellman Equation → Matrix Equation)</summary>
+        <ol class="deriv-list">
+          <li><strong>Index states</strong> s<sub>0</sub>, …, s<sub>N−1</sub>: write V<sup>π</sup>(s<sub>i</sub>) = ∑<sub>a</sub> π(a | s<sub>i</sub>) [ R(s<sub>i</sub>, a) + γ ∑<sub>j</sub> P(s<sub>j</sub> | s<sub>i</sub>, a) V<sup>π</sup>(s<sub>j</sub>) ].</li>
+          <li><strong>Distribute π(a | s<sub>i</sub>)</strong> across the bracket to split immediate reward from discounted next-state value.</li>
+          <li><strong>Swap the two finite sums</strong> ∑<sub>a</sub> and ∑<sub>j</sub> in the second term, factoring V<sup>π</sup>(s<sub>j</sub>) outside the inner action sum.</li>
+          <li><strong>Collapse action sums</strong> into policy-averaged tables: <span class="tok tok-r">r<sup>π</sup>[i] = ∑<sub>a</sub> π(a|s<sub>i</sub>) R(s<sub>i</sub>,a)</span> and <span class="tok tok-p">P<sup>π</sup>[i,j] = ∑<sub>a</sub> π(a|s<sub>i</sub>) P(s<sub>j</sub>|s<sub>i</sub>,a)</span>.</li>
+          <li><strong>Stack all N scalar equations</strong> vertically to obtain <span class="math">v<sup>π</sup> = r<sup>π</sup> + γ P<sup>π</sup> v<sup>π</sup></span>, then turn into the sweep update <span class="math">v<sub>k+1</sub> = r<sup>π</sup> + γ P<sup>π</sup> v<sub>k</sub></span>.</li>
+        </ol>
+      </details>
+
+      <!-- Visual Matrix Equation -->
+      <div id="vecMatrixStage"></div>
+
+      <!-- Hover Dot-Product Inspector -->
+      <div id="vecRowInspector" class="callout callout-purple" style="margin-top:12px;"></div>
+    </div>
+
+    <!-- Exact Matrix Inverse Comparison -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Exact Linear Algebra Check: <span class="math">v<sup>π</sup> = (I − γ P<sup>π</sup>)<sup>−1</sup> r<sup>π</sup></span></h2>
+          <p class="card-sub">Solved directly via built-in Gaussian elimination with partial pivoting and compared against iterative sweeps.</p>
+        </div>
+        <button class="btn btn-purple" id="btnToggleExact">Compare with Exact Matrix Inverse</button>
+      </div>
+      <div id="vecExactPanel"></div>
+    </div>
+  </section>
+
+  <!-- ======================================================================
+       TAB 4: POLICY ITERATION (CONTROL)
+       ====================================================================== -->
+  <section id="tab4" class="tab-panel">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Policy Iteration (Control): <span class="math">π<sub>0</sub> →<sup>E</sup> V<sup>π₀</sup> →<sup>I</sup> π<sub>1</sub> →<sup>E</sup> … → π*</span></h2>
+          <p class="card-sub">Alternate full Policy Evaluation, One-Step Lookahead Q<sup>π</sup>(s, a), and Greedy Policy Improvement until stability.</p>
+        </div>
+        <div id="piStatusBadge"></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btnPiEval">1. Evaluate Current π<sub>m</sub> (Full Eval)</button>
+        <button class="btn btn-purple" id="btnPiLookahead">2. Compute Lookahead Q<sup>π<sub>m</sub></sup>(s, a)</button>
+        <button class="btn btn-green" id="btnPiImprove">3. Improve Policy (π<sub>m</sub> → π<sub>m+1</sub>)</button>
+        <button class="btn" id="btnPiRunFull">Run Full Policy Iteration</button>
+        <button class="btn" id="btnPiReset">Reset to Initial π₀</button>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <!-- Left: Lookahead Q Table + Policy-Induced Matrix Diff -->
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">One-Step Lookahead Table <span class="math">Q<sup>π<sub>m</sub></sup>(s, a)</span></h2>
+              <p class="card-sub">Click any Q(s, a) cell to inspect its Glass-Box arithmetic on the right.</p>
+            </div>
+            <span id="piIterBadge" class="pill pill-pol">Outer Iter m = 0</span>
+          </div>
+          <div class="tbl-wrap" id="piQTable"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Policy-Induced Matrix Diff: <span class="math">P<sup>π<sub>m</sub></sup> &amp; r<sup>π<sub>m</sub></sup></span> vs. <span class="math">P<sup>π<sub>m+1</sub></sup> &amp; r<sup>π<sub>m+1</sub></sup></span></h2>
+              <p class="card-sub">Updating π swaps which rows are pulled into P<sup>π</sup> and r<sup>π</sup> — raw environment physics P(s′ | s, a) NEVER change.</p>
+            </div>
+          </div>
+          <div id="piMatrixDiff"></div>
+        </div>
+      </div>
+
+      <!-- Right: Glass-Box Lookahead Inspector + Theorem Verification Log -->
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Glass-Box Lookahead Inspector</h2>
+              <p class="card-sub">Exact breakdown of Q<sup>π<sub>m</sub></sup>(s, a) = R(s, a) + γ ∑ P(s′ | s, a) V<sup>π<sub>m</sub></sup>(s′).</p>
+            </div>
+          </div>
+          <div id="piGlassBox"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Policy Improvement Theorem Verification Log</h2>
+              <p class="card-sub">Verifies V<sup>π<sub>m</sub></sup>(s) ≥ V<sup>π<sub>m−1</sub></sup>(s) component-wise at every outer iteration.</p>
+            </div>
+          </div>
+          <div class="tbl-wrap" id="piLogTable"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================================
+       TAB 5: VALUE ITERATION & 4-WAY ALGORITHM RACE
+       ====================================================================== -->
+  <section id="tab5" class="tab-panel">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Value Iteration: Direct Bellman Optimality Backups</h2>
+          <p class="card-sub">Truncates policy evaluation to 1 sweep by folding max<sub>a</sub> directly into V<sub>k+1</sub>(s).</p>
+        </div>
+        <div id="viStatusBadge"></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-purple" id="btnViStepState">Step 1 State (Micro-Step)</button>
+        <button class="btn btn-primary" id="btnViStepSweep">Step 1 Sweep (k → k+1)</button>
+        <button class="btn btn-green" id="btnViRunAll">Run to Convergence</button>
+        <button class="btn" id="btnViReset">Reset V₀ = 0</button>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <!-- Left: VI State/Q/Greedy Table -->
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Competing Action Branches &amp; Implicit Greedy Policy</h2>
+            <span id="viSweepBadge" class="pill pill-val">Sweep k = 0</span>
+          </div>
+          <div class="kpi-strip" id="viKpis"></div>
+          <div class="tbl-wrap" id="viTable"></div>
+        </div>
+      </div>
+
+      <!-- Right: Glass-Box VI Inspector -->
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Glass-Box Optimality Inspector (<span class="math">max<sub>a</sub></span>)</h2>
+              <p class="card-sub">Shows all competing action branches inside the Bellman Optimality backup.</p>
+            </div>
+            <div class="btn-row" id="viInspectStatePills"></div>
+          </div>
+          <div id="viGlassBox"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom: 4-Way Algorithm Race -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">4-Way Algorithm Race (Current MDP, γ, and θ)</h2>
+          <p class="card-sub">Compares Synchronous Policy Eval, In-Place Policy Eval, Policy Iteration, and Value Iteration side by side against the exact matrix inverse of π*.</p>
+        </div>
+        <div class="btn-row">
+          <div class="segmented" id="raceChartScale">
+            <button class="seg-btn active" data-scale="log">Log₁₀ Y</button>
+            <button class="seg-btn" data-scale="linear">Linear Y</button>
+          </div>
+          <button class="btn btn-purple" id="btnRunRace">Run 4-Way Race</button>
+        </div>
+      </div>
+      <div id="raceOutput"></div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ========================================================================
+     1. CURATED MDP PRESETS
+     ======================================================================== */
+  const PRESETS = {
+    drone: {
+      name: 'Autonomous Delivery Drone',
+      gamma: 0.80,
+      states: ['High (s₀)', 'Low (s₁)', 'Critical (s₂)'],
+      actions: ['Deliver', 'Recharge'],
+      // R[a][s]
+      R: [
+        [10, 6, -5],
+        [0, -1, -2]
+      ],
+      // P[a][s][sNext]
+      P: [
+        [
+          [0.4, 0.6, 0.0],
+          [0.0, 0.3, 0.7],
+          [0.0, 0.0, 1.0]
+        ],
+        [
+          [1.0, 0.0, 0.0],
+          [0.8, 0.2, 0.0],
+          [0.5, 0.5, 0.0]
+        ]
+      ],
+      defaultEvalPolicy: [0, 0, 1],
+      defaultPiInit: [1, 1, 1]
+    },
+    robot: {
+      name: 'Recycling Robot',
+      gamma: 0.90,
+      states: ['High (s₀)', 'Low (s₁)'],
+      actions: ['Search', 'Wait / Recharge'],
+      R: [
+        [4, 1],
+        [1, 0]
+      ],
+      P: [
+        [
+          [0.7, 0.3],
+          [0.4, 0.6]
+        ],
+        [
+          [1.0, 0.0],
+          [0.9, 0.1]
+        ]
+      ],
+      defaultEvalPolicy: [1, 1],
+      defaultPiInit: [1, 1]
+    },
+    corridor: {
+      name: 'Slippery 4-State Corridor',
+      gamma: 0.90,
+      states: ['Start (s₀)', 'Cell 1 (s₁)', 'Cell 2 (s₂)', 'Goal (s₃)'],
+      actions: ['Move Right', 'Move Left'],
+      R: [
+        [-0.5, -0.5, 2.0, 10.0],
+        [-1.0, -0.5, -0.5, 0.0]
+      ],
+      P: [
+        [
+          [0.2, 0.8, 0.0, 0.0],
+          [0.0, 0.2, 0.8, 0.0],
+          [0.0, 0.0, 0.2, 0.8],
+          [0.8, 0.0, 0.0, 0.2]
+        ],
+        [
+          [1.0, 0.0, 0.0, 0.0],
+          [0.8, 0.2, 0.0, 0.0],
+          [0.0, 0.8, 0.2, 0.0],
+          [0.0, 0.0, 0.8, 0.2]
+        ]
+      ],
+      defaultEvalPolicy: [1, 1, 1, 1],
+      defaultPiInit: [1, 1, 1, 1]
+    }
+  };
+
+  const MAX_SWEEPS = 500;
+  const TIE_EPS = 1e-10;
+
+  /* ========================================================================
+     2. APPLICATION STATE
+     ======================================================================== */
+  const app = {
+    presetKey: 'drone',
+    activeTab: 'tab1',
+    gamma: 0.80,
+    theta: 1e-6,
+    quizMode: false,
+
+    // Active editable MDP
+    mdp: null,
+
+    // Tab 1 UI state
+    designerActionTab: 0,
+    graphActionFilter: -1, // -1 = All Actions
+    designerSelectedNode: 0,
+
+    // Tab 2: Policy Evaluation state
+    evalState: null,
+    evalChartScale: 'linear',
+
+    // Tab 3: Vectorized Matrix state
+    vecState: null,
+
+    // Tab 4: Policy Iteration state
+    piState: null,
+
+    // Tab 5: Value Iteration & Race state
+    viState: null,
+    raceState: null,
+    raceChartScale: 'log'
+  };
+
+  /* ========================================================================
+     3. UTILITY & EXACT LINEAR ALGEBRA FUNCTIONS
+     ======================================================================== */
+  const clone = (obj) => JSON.parse(JSON.stringify(obj));
+
+  function fmt(x, digits = 4) {
+    if (x === null || x === undefined || Number.isNaN(x)) return '—';
+    const cleaned = Math.abs(x) < 1e-12 ? 0 : x;
+    return cleaned.toFixed(digits);
+  }
+
+  function fmtShort(x) {
+    if (x === null || x === undefined || Number.isNaN(x)) return '—';
+    const cleaned = Math.abs(x) < 1e-12 ? 0 : x;
+    if (Math.abs(cleaned) > 0 && Math.abs(cleaned) < 1e-3) return cleaned.toExponential(2);
+    return Number(cleaned.toFixed(2)).toString();
+  }
+
+  function fmtDelta(x) {
+    if (x === null || x === undefined) return '—';
+    if (x === 0) return '0.0000';
+    if (x < 1e-4) return x.toExponential(2);
+    return x.toFixed(4);
+  }
+
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function zeros(n) { return Array(n).fill(0); }
+
+  function maxNormDiff(a, b) {
+    let m = 0;
+    for (let i = 0; i < a.length; i++) {
+      const d = Math.abs(a[i] - b[i]);
+      if (d > m) m = d;
+    }
+    return m;
+  }
+
+  /**
+   * Exact linear solver Ax = b using Gaussian elimination with partial pivoting.
+   * Returns solution vector x, or null if matrix is singular.
+   */
+  function solveLinearSystem(A, b) {
+    const n = b.length;
+    const M = A.map((row, i) => [...row, b[i]]);
+
+    for (let col = 0; col < n; col++) {
+      // Partial pivoting
+      let pivotRow = col;
+      let maxAbs = Math.abs(M[col][col]);
+      for (let r = col + 1; r < n; r++) {
+        const val = Math.abs(M[r][col]);
+        if (val > maxAbs) {
+          maxAbs = val;
+          pivotRow = r;
+        }
+      }
+      if (maxAbs < 1e-12) return null;
+
+      if (pivotRow !== col) {
+        const tmp = M[col];
+        M[col] = M[pivotRow];
+        M[pivotRow] = tmp;
+      }
+
+      // Eliminate below
+      const pivot = M[col][col];
+      for (let r = col + 1; r < n; r++) {
+        const factor = M[r][col] / pivot;
+        M[r][col] = 0;
+        for (let c = col + 1; c <= n; c++) {
+          M[r][c] -= factor * M[col][c];
+        }
+      }
+    }
+
+    // Back-substitution
+    const x = zeros(n);
+    for (let r = n - 1; r >= 0; r--) {
+      let sum = M[r][n];
+      for (let c = r + 1; c < n; c++) {
+        sum -= M[r][c] * x[c];
+      }
+      x[r] = sum / M[r][r];
+    }
+    return x;
+  }
+
+  function buildInducedMatrices(policy) {
+    const N = app.mdp.states.length;
+    const rPi = zeros(N);
+    const PPi = Array.from({ length: N }, () => zeros(N));
+    for (let s = 0; s < N; s++) {
+      const a = policy[s];
+      rPi[s] = app.mdp.R[a][s];
+      for (let sp = 0; sp < N; sp++) {
+        PPi[s][sp] = app.mdp.P[a][s][sp];
+      }
+    }
+    return { rPi, PPi };
+  }
+
+  /**
+   * Computes exact v^pi = (I - gamma * P^pi)^(-1) * r^pi
+   */
+  function solveExactPolicyValue(policy) {
+    const N = app.mdp.states.length;
+    const { rPi, PPi } = buildInducedMatrices(policy);
+    const A = Array.from({ length: N }, (_, i) =>
+      Array.from({ length: N }, (_, j) => (i === j ? 1 : 0) - app.gamma * PPi[i][j])
+    );
+    return solveLinearSystem(A, rPi);
+  }
+
+  function validateMDP() {
+    const N = app.mdp.states.length;
+    const A = app.mdp.actions.length;
+    const invalidRows = [];
+    for (let a = 0; a < A; a++) {
+      for (let s = 0; s < N; s++) {
+        let sum = 0;
+        let hasNeg = false;
+        for (let sp = 0; sp < N; sp++) {
+          const val = app.mdp.P[a][s][sp];
+          if (Number.isNaN(val) || val < -1e-9) hasNeg = true;
+          sum += val;
+        }
+        if (hasNeg || Math.abs(sum - 1) > 1e-6) {
+          invalidRows.push({ a, s, sum, hasNeg });
+        }
+      }
+    }
+    return { valid: invalidRows.length === 0, invalidRows };
+  }
+
+  function computeActionBranch(s, a, VVec, freshFlags = null) {
+    const N = app.mdp.states.length;
+    const r = app.mdp.R[a][s];
+    const terms = [];
+    let expNext = 0;
+    for (let sp = 0; sp < N; sp++) {
+      const p = app.mdp.P[a][s][sp];
+      const v = VVec[sp];
+      expNext += p * v;
+      terms.push({
+        sp,
+        stateName: app.mdp.states[sp],
+        p,
+        v,
+        prod: p * v,
+        isFresh: freshFlags ? Boolean(freshFlags[sp]) : false
+      });
+    }
+    const disc = app.gamma * expNext;
+    const total = r + disc;
+    return { s, a, r, terms, expNext, disc, total };
+  }
+
+  /* ========================================================================
+     4. INITIALIZATION & RESET LOGIC
+     ======================================================================== */
+  function loadPreset(key) {
+    app.presetKey = key;
+    const p = PRESETS[key];
+    app.gamma = p.gamma;
+    app.mdp = {
+      states: [...p.states],
+      actions: [...p.actions],
+      R: clone(p.R),
+      P: clone(p.P),
+      defaultEvalPolicy: [...p.defaultEvalPolicy],
+      defaultPiInit: [...p.defaultPiInit]
+    };
+    app.designerActionTab = 0;
+    app.graphActionFilter = -1;
+    app.designerSelectedNode = 0;
+
+    document.getElementById('presetSelect').value = key;
+    document.getElementById('gammaSlider').value = p.gamma.toFixed(2);
+    document.getElementById('gammaDisplay').textContent = p.gamma.toFixed(2);
+
+    resetAllSimulations(true);
+    renderAll();
+  }
+
+  function clampPolicyArray(arr, N, A, fallbackVal = 0) {
+    const out = [];
+    for (let s = 0; s < N; s++) {
+      const v = arr && arr[s] !== undefined ? arr[s] : fallbackVal;
+      out.push(v >= 0 && v < A ? v : 0);
+    }
+    return out;
+  }
+
+  function resetEvalState(useDefaultPolicy = false) {
+    const N = app.mdp.states.length;
+    const A = app.mdp.actions.length;
+    const prevMode = app.evalState ? app.evalState.mode : 'sync';
+    const prevPolicy = !useDefaultPolicy && app.evalState
+      ? clampPolicyArray(app.evalState.policy, N, A, 0)
+      : clampPolicyArray(app.mdp.defaultEvalPolicy, N, A, 0);
+
+    app.evalState = {
+      policy: prevPolicy,
+      mode: prevMode,
+      k: 0,
+      subState: 0,
+      V_old: zeros(N),
+      V_curr: zeros(N),
+      V_next: zeros(N),
+      updatedInSweep: Array(N).fill(false),
+      selectedState: 0,
+      lastStepInfo: null,
+      history: [{ k: 0, V: zeros(N), delta: null }],
+      converged: false,
+      quizPending: null
+    };
+  }
+
+  function resetVecState() {
+    const N = app.mdp.states.length;
+    const policy = app.evalState ? [...app.evalState.policy] : clampPolicyArray(app.mdp.defaultEvalPolicy, N, app.mdp.actions.length, 0);
+    app.vecState = {
+      policy,
+      k: 0,
+      v_prev: null,
+      v_curr: zeros(N),
+      Pv: null,
+      gPv: null,
+      delta: null,
+      converged: false,
+      hoveredRow: 0,
+      showExact: false
+    };
+  }
+
+  function resetPiState(useDefaultInit = false) {
+    const N = app.mdp.states.length;
+    const A = app.mdp.actions.length;
+    const initPol = useDefaultInit
+      ? clampPolicyArray(app.mdp.defaultPiInit, N, A, A - 1)
+      : clampPolicyArray(app.mdp.defaultPiInit, N, A, A - 1);
+
+    app.piState = {
+      m: 0,
+      phase: 'ready_eval', // 'ready_eval' | 'evaluated' | 'lookahead_done' | 'converged'
+      policy: initPol,
+      V: zeros(N),
+      evalSweeps: 0,
+      Q: null,
+      greedyPolicy: null,
+      selectedQ: { s: 0, a: 0 },
+      log: [],
+      lastDiff: null
+    };
+  }
+
+  function resetViState() {
+    const N = app.mdp.states.length;
+    const A = app.mdp.actions.length;
+    app.viState = {
+      k: 0,
+      subState: 0,
+      V_old: zeros(N),
+      V_next: zeros(N),
+      updatedInSweep: Array(N).fill(false),
+      Q_curr: Array.from({ length: N }, () => zeros(A)),
+      greedyPolicy: zeros(N),
+      selectedState: 0,
+      lastStepInfo: null,
+      history: [{ k: 0, V: zeros(N), delta: null, greedyPolicy: null }],
+      converged: false,
+      quizPending: null
+    };
+  }
+
+  function resetAllSimulations(useDefaults = false) {
+    resetEvalState(useDefaults);
+    resetVecState();
+    resetPiState(useDefaults);
+    resetViState();
+    app.raceState = null;
+  }
+
+  /* ========================================================================
+     5. INTERACTIVE SVG STATE-TRANSITION GRAPH RENDERER
+     ======================================================================== */
+  function getNodePositions(N, W, H) {
+    const cx = W / 2;
+    const cy = H / 2;
+    if (N === 2) {
+      return [
+        { x: W * 0.28, y: cy },
+        { x: W * 0.72, y: cy }
+      ];
+    }
+    if (N === 3) {
+      return [
+        { x: W * 0.26, y: H * 0.28 },
+        { x: W * 0.74, y: H * 0.28 },
+        { x: W * 0.50, y: H * 0.75 }
+      ];
+    }
+    if (N === 4) {
+      return [
+        { x: W * 0.24, y: H * 0.27 },
+        { x: W * 0.76, y: H * 0.27 },
+        { x: W * 0.76, y: H * 0.75 },
+        { x: W * 0.24, y: H * 0.75 }
+      ];
+    }
+    // N === 5 pentagon
+    const R = Math.min(W, H) * 0.34;
+    return Array.from({ length: N }, (_, i) => {
+      const ang = -Math.PI / 2 + (2 * Math.PI * i) / N;
+      return { x: cx + R * Math.cos(ang), y: cy + R * Math.sin(ang) };
+    });
+  }
+
+  function renderMDPGraphSVG(container, opts = {}) {
+    const N = app.mdp.states.length;
+    const A = app.mdp.actions.length;
+    const W = 580;
+    const H = N <= 2 ? 255 : 320;
+    const nodeR = N >= 5 ? 30 : 35;
+    const pos = getNodePositions(N, W, H);
+    const cx = W / 2;
+    const cy = H / 2;
+
+    const actionColors = ['#0969DA', '#7C3AED', '#0F766E'];
+    const filterAction = opts.filterAction !== undefined ? opts.filterAction : -1;
+    const policy = opts.policy || null;
+    const values = opts.values || null;
+    const freshFlags = opts.freshFlags || null;
+    const selectedNode = opts.selectedNode !== undefined ? opts.selectedNode : -1;
+    const updatingNode = opts.updatingNode !== undefined ? opts.updatingNode : -1;
+    const onNodeClickName = opts.onNodeClickName || '';
+
+    let defs = `<defs>`;
+    ['#0969DA', '#7C3AED', '#0F766E', '#94A3B8', '#B45309'].forEach((col, idx) => {
+      defs += `
+        <marker id="arr-${opts.idPrefix}-${idx}" viewBox="0 0 10 10" refX="8.5" refY="5"
+                markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+          <path d="M 0 1.5 L 10 5 L 0 8.5 z" fill="${col}"/>
+        </marker>`;
+    });
+    defs += `</defs>`;
+
+    const colorToMarkerIdx = {
+      '#0969DA': 0,
+      '#7C3AED': 1,
+      '#0F766E': 2,
+      '#94A3B8': 3,
+      '#B45309': 4
+    };
+
+    let edgesSvg = '';
+    let labelsSvg = '';
+
+    // Collect transitions to draw
+    for (let a = 0; a < A; a++) {
+      if (filterAction !== -1 && filterAction !== a) continue;
+
+      for (let s = 0; s < N; s++) {
+        // In Policy Evaluation graph mode, emphasize only active policy edges unless filtered
+        const isPolicyEdge = policy ? policy[s] === a : false;
+        if (policy && !isPolicyEdge) continue;
+
+        for (let sp = 0; sp < N; sp++) {
+          const prob = app.mdp.P[a][s][sp];
+          if (prob <= 1e-6) continue;
+
+          const rew = app.mdp.R[a][s];
+          const isHighlighted = selectedNode === -1 || selectedNode === s;
+          const strokeCol = policy ? '#7C3AED' : actionColors[a % actionColors.length];
+          const effColor = isHighlighted ? strokeCol : '#94A3B8';
+          const opacity = isHighlighted ? 0.92 : 0.28;
+          const strokeW = isHighlighted ? 2.1 : 1.3;
+          const markerId = `arr-${opts.idPrefix}-${colorToMarkerIdx[effColor] ?? 3}`;
+
+          if (s === sp) {
+            // Self-loop oriented outward from center
+            let dx = pos[s].x - cx;
+            let dy = pos[s].y - cy;
+            const len = Math.hypot(dx, dy) || 1;
+            if (Math.hypot(dx, dy) < 5) { dx = 0; dy = -1; } else { dx /= len; dy /= len; }
+            // Offset angle slightly per action so multiple self-loops separate cleanly
+            const baseAng = Math.atan2(dy, dx) + (filterAction === -1 && !policy ? (a - (A - 1) / 2) * 0.55 : 0);
+            const ang1 = baseAng - 0.42;
+            const ang2 = baseAng + 0.42;
+            const x1 = pos[s].x + nodeR * Math.cos(ang1);
+            const y1 = pos[s].y + nodeR * Math.sin(ang1);
+            const x2 = pos[s].x + nodeR * Math.cos(ang2);
+            const y2 = pos[s].y + nodeR * Math.sin(ang2);
+            const loopR = nodeR + 40;
+            const c1x = pos[s].x + loopR * Math.cos(ang1 - 0.15);
+            const c1y = pos[s].y + loopR * Math.sin(ang1 - 0.15);
+            const c2x = pos[s].x + loopR * Math.cos(ang2 + 0.15);
+            const c2y = pos[s].y + loopR * Math.sin(ang2 + 0.15);
+
+            edgesSvg += `<path d="M ${x1.toFixed(1)} ${y1.toFixed(1)} C ${c1x.toFixed(1)} ${c1y.toFixed(1)}, ${c2x.toFixed(1)} ${c2y.toFixed(1)}, ${x2.toFixed(1)} ${y2.toFixed(1)}"
+              fill="none" stroke="${effColor}" stroke-width="${strokeW}" stroke-opacity="${opacity}" marker-end="url(#${markerId})"/>`;
+
+            const lx = pos[s].x + (nodeR + 38) * Math.cos(baseAng);
+            const ly = pos[s].y + (nodeR + 38) * Math.sin(baseAng);
+            if (isHighlighted) {
+              const shortA = app.mdp.actions[a].slice(0, 4);
+              const tag = policy ? `${fmtShort(prob)} | R:${fmtShort(rew)}` : `${shortA}:${fmtShort(prob)}`;
+              labelsSvg += renderSvgPillLabel(lx, ly, tag, effColor);
+            }
+          } else {
+            // Directed curved Bezier edge s -> sp
+            const x1 = pos[s].x, y1 = pos[s].y;
+            const x2 = pos[sp].x, y2 = pos[sp].y;
+            const dx = x2 - x1, dy = y2 - y1;
+            const dist = Math.hypot(dx, dy) || 1;
+            const ux = dx / dist, uy = dy / dist;
+            // Perpendicular unit vector (consistent right-hand bend separates s->sp and sp->s)
+            const px = -uy, py = ux;
+
+            const actionShift = (filterAction === -1 && !policy) ? (a * 22) : 0;
+            const bend = 24 + actionShift;
+
+            const sx = x1 + ux * nodeR + px * 5;
+            const sy = y1 + uy * nodeR + py * 5;
+            const ex = x2 - ux * (nodeR + 4) + px * 5;
+            const ey = y2 - uy * (nodeR + 4) + py * 5;
+
+            const mx = (sx + ex) / 2 + px * bend;
+            const my = (sy + ey) / 2 + py * bend;
+
+            edgesSvg += `<path d="M ${sx.toFixed(1)} ${sy.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}"
+              fill="none" stroke="${effColor}" stroke-width="${strokeW}" stroke-opacity="${opacity}" marker-end="url(#${markerId})"/>`;
+
+            // Label at midpoint of quadratic Bezier t=0.5: 0.25*S + 0.5*M + 0.25*E
+            const lx = 0.25 * sx + 0.5 * mx + 0.25 * ex;
+            const ly = 0.25 * sy + 0.5 * my + 0.25 * ey;
+            if (isHighlighted) {
+              const shortA = app.mdp.actions[a].slice(0, 4);
+              const tag = policy ? `p=${fmtShort(prob)} | R=${fmtShort(rew)}` : `${shortA} ${fmtShort(prob)}`;
+              labelsSvg += renderSvgPillLabel(lx, ly, tag, effColor);
+            }
+          }
+        }
+      }
+    }
+
+    // Draw state nodes
+    let nodesSvg = '';
+    for (let s = 0; s < N; s++) {
+      const { x, y } = pos[s];
+      const isSel = selectedNode === s;
+      const isUpd = updatingNode === s;
+      const isFresh = freshFlags && freshFlags[s];
+
+      let fill = '#FFFFFF';
+      let stroke = '#1F2328';
+      let strokeW = 2;
+
+      if (isUpd) {
+        fill = '#F5F3FF';
+        stroke = '#7C3AED';
+        strokeW = 3.2;
+      } else if (isFresh) {
+        fill = '#CCFBF1';
+        stroke = '#0F766E';
+        strokeW = 2.8;
+      } else if (isSel) {
+        fill = '#EFF6FF';
+        stroke = '#0969DA';
+        strokeW = 3;
+      }
+
+      const labelText = app.mdp.states[s];
+      const shortName = labelText.length > 13 ? labelText.slice(0, 12) + '…' : labelText;
+      const valLine = values ? `V=${fmt(values[s], 2)}` : `s${s}`;
+
+      nodesSvg += `
+        <g class="svg-node" data-node="${s}" style="cursor:pointer;" ${onNodeClickName ? `data-handler="${onNodeClickName}"` : ''}>
+          ${isUpd ? `<circle cx="${x}" cy="${y}" r="${nodeR + 6}" fill="none" stroke="#7C3AED" stroke-width="2" stroke-dasharray="4 3"/>` : ''}
+          <circle cx="${x}" cy="${y}" r="${nodeR}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}"/>
+          <text x="${x}" y="${y - (values ? 5 : 2)}" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1F2328">${escHtml(shortName)}</text>
+          <text x="${x}" y="${y + (values ? 12 : 13)}" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="11.5" font-weight="700" fill="${values ? '#059669' : '#57606A'}">${escHtml(valLine)}</text>
+          ${isFresh ? `<rect x="${x - 22}" y="${y - nodeR - 14}" width="44" height="15" rx="7" fill="#CCFBF1" stroke="#0F766E" stroke-width="1"/>
+          <text x="${x}" y="${y - nodeR - 3.5}" text-anchor="middle" font-size="9" font-weight="700" fill="#0F766E">FRESH</text>` : ''}
+        </g>`;
+    }
+
+    // Legend inside SVG for designer
+    let svgLegend = '';
+    if (!policy) {
+      let lx = 12;
+      for (let a = 0; a < A; a++) {
+        if (filterAction !== -1 && filterAction !== a) continue;
+        const col = actionColors[a % actionColors.length];
+        svgLegend += `<rect x="${lx}" y="8" width="10" height="10" rx="2" fill="${col}"/>
+          <text x="${lx + 14}" y="17" font-size="11" font-weight="600" fill="#57606A">${escHtml(app.mdp.actions[a])}</text>`;
+        lx += 28 + app.mdp.actions[a].length * 7;
+      }
+    }
+
+    container.innerHTML = `
+      <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="MDP State Transition Diagram">
+        ${defs}
+        ${svgLegend}
+        ${edgesSvg}
+        ${labelsSvg}
+        ${nodesSvg}
+      </svg>`;
+
+    container.querySelectorAll('.svg-node').forEach(el => {
+      el.addEventListener('click', () => {
+        const idx = Number(el.dataset.node);
+        if (opts.onNodeClick) opts.onNodeClick(idx);
+      });
+    });
+  }
+
+  function renderSvgPillLabel(x, y, text, color) {
+    const w = Math.max(38, text.length * 6.2 + 10);
+    return `
+      <g>
+        <rect x="${(x - w / 2).toFixed(1)}" y="${(y - 9).toFixed(1)}" width="${w.toFixed(1)}" height="17" rx="5"
+              fill="#FFFFFF" fill-opacity="0.94" stroke="${color}" stroke-width="1"/>
+        <text x="${x.toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="middle"
+              font-family="ui-monospace,Consolas,monospace" font-size="10" font-weight="700" fill="${color}">${escHtml(text)}</text>
+      </g>`;
+  }
+
+  /* ========================================================================
+     6. SVG CONTRACTION CHART RENDERER (SINGLE & MULTI-SERIES)
+     ======================================================================== */
+  function renderContractionChartSVG(container, config) {
+    const { series, theta, logScale, theoreticalEnv } = config;
+    const W = 820;
+    const H = 225;
+    const pad = { top: 20, right: 24, bottom: 36, left: 66 };
+    const plotW = W - pad.left - pad.right;
+    const plotH = H - pad.top - pad.bottom;
+
+    // Gather all points
+    let maxK = 1;
+    let maxY = theta * 10;
+    let minY = theta;
+
+    const allSeries = [...series];
+    if (theoreticalEnv && theoreticalEnv.points.length > 0) {
+      allSeries.push(theoreticalEnv);
+    }
+
+    allSeries.forEach(s => {
+      s.points.forEach(pt => {
+        if (pt.k > maxK) maxK = pt.k;
+        if (pt.y > maxY) maxY = pt.y;
+        if (pt.y > 0 && pt.y < minY) minY = pt.y;
+      });
+    });
+
+    if (series.every(s => s.points.length === 0)) {
+      container.innerHTML = `<div style="padding:36px;text-align:center;color:var(--muted);font-size:13px;">
+        Step at least 1 full sweep (k = 1) to plot the max-norm contraction curve Δ<sub>k</sub> = ‖V<sub>k</sub> − V<sub>k−1</sub>‖<sub>∞</sub>.
+      </div>`;
+      return;
+    }
+
+    const logMin = Math.floor(Math.log10(Math.max(1e-9, Math.min(minY, theta * 0.3))));
+    const logMax = Math.ceil(Math.log10(Math.max(maxY * 1.15, theta * 10)));
+
+    const xScale = (k) => {
+      if (maxK <= 1) return pad.left + plotW * 0.5;
+      return pad.left + ((k - 1) / (maxK - 1)) * plotW;
+    };
+
+    const yScale = (y) => {
+      if (logScale) {
+        const clamped = Math.max(Math.pow(10, logMin), y);
+        const ly = Math.log10(clamped);
+        const frac = (ly - logMin) / Math.max(1e-6, logMax - logMin);
+        return pad.top + plotH * (1 - frac);
+      } else {
+        const topVal = Math.max(maxY * 1.12, 1e-6);
+        const frac = Math.max(0, y) / topVal;
+        return pad.top + plotH * (1 - frac);
+      }
+    };
+
+    // Grid & Y-axis ticks
+    let gridSvg = '';
+    if (logScale) {
+      for (let exp = logMin; exp <= logMax; exp++) {
+        const yVal = Math.pow(10, exp);
+        const py = yScale(yVal);
+        gridSvg += `<line x1="${pad.left}" y1="${py.toFixed(1)}" x2="${W - pad.right}" y2="${py.toFixed(1)}" stroke="#E5E7EB" stroke-width="1"/>
+          <text x="${pad.left - 8}" y="${(py + 3.5).toFixed(1)}" text-anchor="end" font-family="ui-monospace,Consolas,monospace" font-size="10.5" fill="#57606A">1e${exp}</text>`;
+      }
+    } else {
+      const steps = 4;
+      const topVal = Math.max(maxY * 1.12, 1e-6);
+      for (let i = 0; i <= steps; i++) {
+        const yVal = (topVal * i) / steps;
+        const py = yScale(yVal);
+        gridSvg += `<line x1="${pad.left}" y1="${py.toFixed(1)}" x2="${W - pad.right}" y2="${py.toFixed(1)}" stroke="#E5E7EB" stroke-width="1"/>
+          <text x="${pad.left - 8}" y="${(py + 3.5).toFixed(1)}" text-anchor="end" font-family="ui-monospace,Consolas,monospace" font-size="10.5" fill="#57606A">${fmtShort(yVal)}</text>`;
+      }
+    }
+
+    // X-axis ticks
+    const xTicks = Math.min(8, maxK);
+    for (let i = 0; i < xTicks; i++) {
+      const k = xTicks === 1 ? 1 : Math.round(1 + (i * (maxK - 1)) / (xTicks - 1));
+      const px = xScale(k);
+      gridSvg += `<line x1="${px.toFixed(1)}" y1="${pad.top}" x2="${px.toFixed(1)}" y2="${pad.top + plotH}" stroke="#F1F5F9" stroke-width="1"/>
+        <text x="${px.toFixed(1)}" y="${H - 12}" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="10.5" fill="#57606A">${k}</text>`;
+    }
+
+    // Theta threshold line
+    const thetaY = yScale(theta);
+    let thetaSvg = '';
+    if (thetaY >= pad.top - 2 && thetaY <= pad.top + plotH + 2) {
+      thetaSvg = `
+        <line x1="${pad.left}" y1="${thetaY.toFixed(1)}" x2="${W - pad.right}" y2="${thetaY.toFixed(1)}"
+              stroke="#CF222E" stroke-width="1.4" stroke-dasharray="5 4"/>
+        <text x="${W - pad.right - 4}" y="${(thetaY - 5).toFixed(1)}" text-anchor="end"
+              font-family="ui-monospace,Consolas,monospace" font-size="10.5" font-weight="700" fill="#CF222E">θ = ${theta}</text>`;
+    }
+
+    // Plot series polylines
+    let pathsSvg = '';
+    allSeries.forEach(s => {
+      if (!s.points.length) return;
+      const d = s.points.map((pt, idx) =>
+        `${idx === 0 ? 'M' : 'L'} ${xScale(pt.k).toFixed(1)} ${yScale(pt.y).toFixed(1)}`
+      ).join(' ');
+      pathsSvg += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.dashed ? 1.6 : 2.3}" ${s.dashed ? 'stroke-dasharray="5 4"' : ''}/>`;
+      if (!s.dashed && s.points.length <= 28) {
+        s.points.forEach(pt => {
+          pathsSvg += `<circle cx="${xScale(pt.k).toFixed(1)}" cy="${yScale(pt.y).toFixed(1)}" r="3.2" fill="${s.color}" stroke="#fff" stroke-width="1"/>`;
+        });
+      }
+    });
+
+    // Legend row
+    let legX = pad.left;
+    let legSvg = '';
+    allSeries.forEach(s => {
+      if (!s.points.length) return;
+      legSvg += `
+        <line x1="${legX}" y1="10" x2="${legX + 16}" y2="10" stroke="${s.color}" stroke-width="2.4" ${s.dashed ? 'stroke-dasharray="4 3"' : ''}/>
+        <text x="${legX + 21}" y="13.5" font-size="11" font-weight="600" fill="#1F2328">${escHtml(s.label)}</text>`;
+      legX += 36 + s.label.length * 6.5;
+    });
+
+    container.innerHTML = `
+      <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+        ${gridSvg}
+        <line x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${pad.top + plotH}" stroke="#94A3B8" stroke-width="1.2"/>
+        <line x1="${pad.left}" y1="${pad.top + plotH}" x2="${W - pad.right}" y2="${pad.top + plotH}" stroke="#94A3B8" stroke-width="1.2"/>
+        ${thetaSvg}
+        ${pathsSvg}
+        ${legSvg}
+        <text x="${pad.left + plotW / 2}" y="${H - 1}" text-anchor="middle" font-size="11" font-weight="600" fill="#57606A">Sweep k</text>
+        <text x="15" y="${pad.top + plotH / 2}" text-anchor="middle" transform="rotate(-90 15 ${pad.top + plotH / 2})" font-size="11" font-weight="600" fill="#57606A">Δk (${logScale ? 'log₁₀' : 'linear'})</text>
+      </svg>`;
+  }
+
+  /* ========================================================================
+     7. TAB 1: MDP DESIGNER RENDER & HANDLERS
+     ======================================================================== */
+  function renderTab1() {
+    const N = app.mdp.states.length;
+    const A = app.mdp.actions.length;
+
+    document.getElementById('btnAddState').disabled = N >= 5;
+    document.getElementById('btnRemState').disabled = N <= 2;
+    document.getElementById('btnAddAction').disabled = A >= 3;
+    document.getElementById('btnRemAction').disabled = A <= 2;
+
+    // State Name Inputs
+    const sWrap = document.getElementById('stateNameInputs');
+    sWrap.innerHTML = app.mdp.states.map((name, s) => `
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span class="mono" style="font-size:11.5px;color:var(--muted);width:22px;">s<sub>${s}</sub></span>
+        <input type="text" data-state-name="${s}" value="${escHtml(name)}" style="flex:1;">
+      </div>`).join('');
+    sWrap.querySelectorAll('input').forEach(inp => {
+      inp.addEventListener('input', e => {
+        const s = Number(e.target.dataset.stateName);
+        app.mdp.states[s] = e.target.value || `State ${s}`;
+        renderTab1GraphAndSummary();
+      });
+    });
+
+    // Action Name Inputs
+    const aWrap = document.getElementById('actionNameInputs');
+    aWrap.innerHTML = app.mdp.actions.map((name, a) => `
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span class="mono" style="font-size:11.5px;color:var(--muted);width:22px;">a<sub>${a}</sub></span>
+        <input type="text" data-action-name="${a}" value="${escHtml(name)}" style="flex:1;">
+      </div>`).join('');
+    aWrap.querySelectorAll('input').forEach(inp => {
+      inp.addEventListener('input', e => {
+        const a = Number(e.target.dataset.actionName);
+        app.mdp.actions[a] = e.target.value || `Action ${a}`;
+        renderTab1TablesAndTabs();
+        renderTab1GraphAndSummary();
+      });
+    });
+
+    renderTab1TablesAndTabs();
+    renderTab1GraphAndSummary();
+  }
+
+  function renderTab1TablesAndTabs() {
+    const N = app.mdp.states.length;
+    const A = app.mdp.actions.length;
+    if (app.designerActionTab >= A) app.designerActionTab = 0;
+
+    // Reward Table R(s, a)
+    let rHtml = `<table><thead><tr><th>State s</th>`;
+    for (let a = 0; a < A; a++) {
+      rHtml += `<th style="text-align:right;color:var(--c-reward);">R(s, ${escHtml(app.mdp.actions[a])})</th>`;
+    }
+    rHtml += `</tr></thead><tbody>`;
+    for (let s = 0; s < N; s++) {
+      rHtml += `<tr><td><strong>${escHtml(app.mdp.states[s])}</strong></td>`;
+      for (let a = 0; a < A; a++) {
+        rHtml += `<td style="text-align:right;">
+          <input type="number" step="0.5" class="input-num input-reward" data-r-a="${a}" data-r-s="${s}" value="${app.mdp.R[a][s]}">
+        </td>`;
+      }
+      rHtml += `</tr>`;
+    }
+    rHtml += `</tbody></table>`;
+    const rCont = document.getElementById('rewardTableContainer');
+    rCont.innerHTML = rHtml;
+    rCont.querySelectorAll('input').forEach(inp => {
+      inp.addEventListener('change', e => {
+        const a = Number(e.target.dataset.rA);
+        const s = Number(e.target.dataset.rS);
+        const val = parseFloat(e.target.value);
+        app.mdp.R[a][s] = Number.isNaN(val) ? 0 : val;
+        resetAllSimulations(false);
+        renderTab1GraphAndSummary();
+        renderValidationBanner();
+      });
+    });
+
+    // Action tabs for Transition Table
+    const actTabs = document.getElementById('designerActionTabs');
+    actTabs.innerHTML = app.mdp.actions.map((name, a) => `
+      <button class="seg-btn ${app.designerActionTab === a ? 'active' : ''}" data-act-tab="${a}">${escHtml(name)}</button>
+    `).join('');
+    actTabs.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        app.designerActionTab = Number(btn.dataset.actTab);
+        renderTab1TablesAndTabs();
+      });
+    });
+
+    // Transition Table for selected action
+    const aSel = app.designerActionTab;
+    let pHtml = `<table><thead><tr><th>From s \\ To s′</th>`;
+    for (let sp = 0; sp < N; sp++) {
+      pHtml += `<th style="text-align:right;">${escHtml(app.mdp.states[sp])}</th>`;
+    }
+    pHtml += `<th style="text-align:center;">Row Sum</th></tr></thead><tbody>`;
+
+    for (let s = 0; s < N; s++) {
+      let sum = 0;
+      let hasNeg = false;
+      for (let sp = 0; sp < N; sp++) {
+        const v = app.mdp.P[aSel][s][sp];
+        if (v < -1e-9) hasNeg = true;
+        sum += v;
+      }
+      const isOk = !hasNeg && Math.abs(sum - 1) <= 1e-6;
+      pHtml += `<tr><td><strong>${escHtml(app.mdp.states[s])}</strong></td>`;
+      for (let sp = 0; sp < N; sp++) {
+        pHtml += `<td style="text-align:right;">
+          <input type="number" step="0.1" min="0" max="1" class="input-num input-prob"
+                 data-p-a="${aSel}" data-p-s="${s}" data-p-sp="${sp}" value="${app.mdp.P[aSel][s][sp]}">
+        </td>`;
+      }
+      pHtml += `<td style="text-align:center;white-space:nowrap;">
+        <span class="pill ${isOk ? 'pill-val' : 'pill-danger'}">${sum.toFixed(2)}</span>
+        ${!isOk ? `<button class="btn btn-sm" style="margin-left:4px;" data-norm-a="${aSel}" data-norm-s="${s}">Normalize</button>` : ''}
+      </td></tr>`;
+    }
+    pHtml += `</tbody></table>`;
+    const pCont = document.getElementById('probTableContainer');
+    pCont.innerHTML = pHtml;
+
+    pCont.querySelectorAll('input').forEach(inp => {
+      inp.addEventListener('change', e => {
+        const a = Number(e.target.dataset.pA);
+        const s = Number(e.target.dataset.pS);
+        const sp = Number(e.target.dataset.pSp);
+        const val = parseFloat(e.target.value);
+        app.mdp.P[a][s][sp] = Number.isNaN(val) ? 0 : val;
+        resetAllSimulations(false);
+        renderTab1TablesAndTabs();
+        renderTab1GraphAndSummary();
+        renderValidationBanner();
+      });
+    });
+
+    pCont.querySelectorAll('[data-norm-s]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        normalizeProbRow(Number(btn.dataset.normA), Number(btn.dataset.normS));
+        resetAllSimulations(false);
+        renderTab1TablesAndTabs();
+        renderTab1GraphAndSummary();
+        renderValidationBanner();
+      });
+    });
+  }
+
+  function normalizeProbRow(a, s) {
+    const N = app.mdp.states.length;
+    const row = app.mdp.P[a][s].map(v => Math.max(0, Number.isNaN(v) ? 0 : v));
+    const sum = row.reduce((acc, v) => acc + v, 0);
+    if (sum <= 1e-12) {
+      app.mdp.P[a][s] = Array(N).fill(Number((1 / N).toFixed(4)));
+      // ensure exact sum 1
+      const rem = 1 - app.mdp.P[a][s].slice(0, -1).reduce((x, y) => x + y, 0);
+      app.mdp.P[a][s][N - 1] = Number(rem.toFixed(4));
+    } else {
+      let running = 0;
+      for (let sp = 0; sp < N - 1; sp++) {
+        const v = Number((row[sp] / sum).toFixed(4));
+        app.mdp.P[a][s][sp] = v;
+        running += v;
+      }
+      app.mdp.P[a][s][N - 1] = Number(Math.max(0, 1 - running).toFixed(4));
+    }
+  }
+
+  function renderTab1GraphAndSummary() {
+    const N = app.mdp.states.length;
+    const A = app.mdp.actions.length;
+    if (app.designerSelectedNode >= N) app.designerSelectedNode = 0;
+    if (app.graphActionFilter >= A) app.graphActionFilter = -1;
+
+    // Graph Filter Buttons
+    const filt = document.getElementById('graphActionFilter');
+    let fHtml = `<button class="seg-btn ${app.graphActionFilter === -1 ? 'active' : ''}" data-gf="-1">All Actions</button>`;
+    for (let a = 0; a < A; a++) {
+      fHtml += `<button class="seg-btn ${app.graphActionFilter === a ? 'active' : ''}" data-gf="${a}">${escHtml(app.mdp.actions[a])}</button>`;
+    }
+    filt.innerHTML = fHtml;
+    filt.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        app.graphActionFilter = Number(btn.dataset.gf);
+        renderTab1GraphAndSummary();
+      });
+    });
+
+    renderMDPGraphSVG(document.getElementById('designerGraphStage'), {
+      idPrefix: 'des',
+      filterAction: app.graphActionFilter,
+      selectedNode: app.designerSelectedNode,
+      onNodeClick: (s) => {
+        app.designerSelectedNode = app.designerSelectedNode === s ? -1 : s;
+        renderTab1GraphAndSummary();
+      }
+    });
+
+    const summary = document.getElementById('designerNodeSummary');
+    if (app.designerSelectedNode === -1) {
+      summary.innerHTML = `<strong>Overview:</strong> Showing all ${N} states and ${A} actions (discount <span class="math">γ = ${app.gamma.toFixed(2)}</span>). Click any state node to focus on its outgoing dynamics.`;
+    } else {
+      const s = app.designerSelectedNode;
+      let lines = `<strong>Selected State: ${escHtml(app.mdp.states[s])}</strong>`;
+      for (let a = 0; a < A; a++) {
+        const dests = [];
+        for (let sp = 0; sp < N; sp++) {
+          const p = app.mdp.P[a][s][sp];
+          if (p > 0) dests.push(`<span class="tok tok-p">${fmtShort(p)}</span> → ${escHtml(app.mdp.states[sp])}`);
+        }
+        lines += `<div style="margin-top:4px;">Action <strong>${escHtml(app.mdp.actions[a])}</strong>: Reward <span class="tok tok-r">${app.mdp.R[a][s]}</span> | Transitions: ${dests.join(', ') || 'none'}</div>`;
+      }
+      summary.innerHTML = lines;
+    }
+  }
+
+  /* ========================================================================
+     8. TAB 2: POLICY EVALUATION ENGINE & RENDERING
+     ======================================================================== */
+  function evalStepSingleState(bypassQuiz = false) {
+    if (!validateMDP().valid) return;
+    const st = app.evalState;
+    const N = app.mdp.states.length;
+
+    // If starting a fresh sweep, snapshot V_old
+    if (st.subState === 0) {
+      st.V_old = [...st.V_curr];
+      st.V_next = [...st.V_curr];
+      st.updatedInSweep = Array(N).fill(false);
+    }
+
+    const s = st.subState;
+    const sourceVec = st.mode === 'inplace' ? st.V_curr : st.V_old;
+    const freshSnapshot = st.mode === 'inplace' ? [...st.updatedInSweep] : Array(N).fill(false);
+
+    // Compute all action branches for Glass-Box transparency
+    const branches = app.mdp.actions.map((_, a) => ({
+      weight: st.policy[s] === a ? 1.0 : 0.0,
+      detail: computeActionBranch(s, a, sourceVec, freshSnapshot)
+    }));
+    const newVal = branches.reduce((acc, b) => acc + b.weight * b.detail.total, 0);
+
+    // Predict-It Quiz interception
+    if (app.quizMode && !bypassQuiz) {
+      st.selectedState = s;
+      st.quizPending = {
+        stateIdx: s,
+        expectedVal: newVal,
+        branches,
+        sourceVec: [...sourceVec],
+        freshSnapshot,
+        feedback: null,
+        solved: false
+      };
+      renderTab2();
+      return;
+    }
+
+    st.quizPending = null;
+    if (st.mode === 'inplace') {
+      st.V_curr[s] = newVal;
+    } else {
+      st.V_next[s] = newVal;
+    }
+    st.updatedInSweep[s] = true;
+    st.selectedState = s;
+    st.lastStepInfo = {
+      s,
+      sweepNum: st.k + 1,
+      mode: st.mode,
+      branches,
+      oldVal: st.V_old[s],
+      newVal,
+      sourceVec: [...sourceVec],
+      freshSnapshot
+    };
+
+    st.subState++;
+    if (st.subState >= N) {
+      // Finish sweep
+      if (st.mode === 'sync') {
+        st.V_curr = [...st.V_next];
+      }
+      const delta = maxNormDiff(st.V_curr, st.V_old);
+      st.k++;
+      st.subState = 0;
+      st.history.push({ k: st.k, V: [...st.V_curr], delta });
+      if (delta < app.theta) st.converged = true;
+    }
+
+    renderTab2();
+  }
+
+  function evalStepFullSweep() {
+    if (!validateMDP().valid) return;
+    const st = app.evalState;
+    const N = app.mdp.states.length;
+    st.quizPending = null;
+    const remaining = N - st.subState;
+    for (let i = 0; i < remaining; i++) {
+      evalStepSingleState(true);
+    }
+  }
+
+  function evalRunToConvergence() {
+    if (!validateMDP().valid) return;
+    const st = app.evalState;
+    st.quizPending = null;
+    // Finish partial sweep first if any
+    if (st.subState > 0) evalStepFullSweep();
+    let guard = 0;
+    while (!st.converged && st.k < MAX_SWEEPS && guard < MAX_SWEEPS) {
+      const N = app.mdp.states.length;
+      st.V_old = [...st.V_curr];
+      st.V_next = [...st.V_curr];
+      st.updatedInSweep = Array(N).fill(false);
+
+      let lastInfo = null;
+      for (let s = 0; s < N; s++) {
+        const sourceVec = st.mode === 'inplace' ? st.V_curr : st.V_old;
+        const freshSnapshot = st.mode === 'inplace' ? [...st.updatedInSweep] : Array(N).fill(false);
+        const branches = app.mdp.actions.map((_, a) => ({
+          weight: st.policy[s] === a ? 1.0 : 0.0,
+          detail: computeActionBranch(s, a, sourceVec, freshSnapshot)
+        }));
+        const newVal = branches.reduce((acc, b) => acc + b.weight * b.detail.total, 0);
+        if (st.mode === 'inplace') st.V_curr[s] = newVal;
+        else st.V_next[s] = newVal;
+        st.updatedInSweep[s] = true;
+        if (s === st.selectedState || s === N - 1) {
+          lastInfo = { s, sweepNum: st.k + 1, mode: st.mode, branches, oldVal: st.V_old[s], newVal, sourceVec: [...sourceVec], freshSnapshot };
+        }
+      }
+      if (st.mode === 'sync') st.V_curr = [...st.V_next];
+      const delta = maxNormDiff(st.V_curr, st.V_old);
+      st.k++;
+      st.history.push({ k: st.k, V: [...st.V_curr], delta });
+      st.lastStepInfo = lastInfo;
+      if (delta < app.theta) st.converged = true;
+      guard++;
+    }
+    renderTab2();
+  }
+
+  function renderPolicySelectorBar(container, policy, onChange) {
+    const N = app.mdp.states.length;
+    const A = app.mdp.actions.length;
+    let html = `<strong style="font-size:12.5px;color:var(--c-pol);">Frozen Policy <span class="math">π(s)</span>:</strong>`;
+    for (let s = 0; s < N; s++) {
+      html += `<div class="policy-item">
+        <span>${escHtml(app.mdp.states[s])}:</span>
+        <div class="segmented">`;
+      for (let a = 0; a < A; a++) {
+        html += `<button class="seg-btn ${policy[s] === a ? 'active-purple' : ''}" data-ps="${s}" data-pa="${a}">${escHtml(app.mdp.actions[a])}</button>`;
+      }
+      html += `</div></div>`;
+    }
+    container.innerHTML = html;
+    container.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        onChange(Number(btn.dataset.ps), Number(btn.dataset.pa));
+      });
+    });
+  }
+
+  function renderTab2() {
+    const st = app.evalState;
+    const N = app.mdp.states.length;
+    const valid = validateMDP().valid;
+
+    // Mode toggle buttons
+    document.querySelectorAll('#evalModeToggle .seg-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.mode === st.mode);
+    });
+
+    // Policy selector bar (shared with Tab 3)
+    renderPolicySelectorBar(document.getElementById('evalPolicyBar'), st.policy, (s, a) => {
+      st.policy[s] = a;
+      resetEvalState(false);
+      resetVecState();
+      renderTab2();
+      if (app.activeTab === 'tab3') renderTab3();
+    });
+
+    // Enable/disable controls
+    document.getElementById('btnEvalStepState').disabled = !valid || st.quizPending !== null;
+    document.getElementById('btnEvalStepSweep').disabled = !valid;
+    document.getElementById('btnEvalRunAll').disabled = !valid;
+
+    // Status badge
+    const statusEl = document.getElementById('evalStatusBadge');
+    const lastDelta = st.history[st.history.length - 1].delta;
+    if (st.quizPending) {
+      statusEl.innerHTML = `<span class="pill pill-pol">Quiz Mode: Predict V(${escHtml(app.mdp.states[st.quizPending.stateIdx])})</span>`;
+    } else if (st.converged) {
+      statusEl.innerHTML = `<span class="pill pill-val">Converged in ${st.k} sweeps (Δ = ${fmtDelta(lastDelta)} &lt; θ)</span>`;
+    } else if (st.subState > 0) {
+      statusEl.innerHTML = `<span class="pill pill-pol">Mid-Sweep ${st.k + 1}: Next → ${escHtml(app.mdp.states[st.subState])}</span>`;
+    } else {
+      statusEl.innerHTML = `<span class="pill pill-muted">Ready for Sweep ${st.k + 1}</span>`;
+    }
+
+    // Graph
+    const displayedV = st.mode === 'sync' && st.subState > 0
+      ? st.V_old.map((v, i) => st.updatedInSweep[i] ? st.V_next[i] : v)
+      : st.V_curr;
+
+    renderMDPGraphSVG(document.getElementById('evalGraphStage'), {
+      idPrefix: 'eval',
+      policy: st.policy,
+      values: displayedV,
+      freshFlags: st.mode === 'inplace' && st.subState > 0 ? st.updatedInSweep : null,
+      selectedNode: st.selectedState,
+      updatingNode: st.quizPending ? st.quizPending.stateIdx : (st.subState > 0 ? st.subState - 1 : -1),
+      onNodeClick: (s) => {
+        st.selectedState = s;
+        renderTab2();
+      }
+    });
+
+    // KPIs & Value Table
+    document.getElementById('evalSweepCounter').textContent = `Sweep k = ${st.k}${st.subState > 0 ? ` (+${st.subState}/${N})` : ''}`;
+    document.getElementById('evalKpis').innerHTML = `
+      <div class="kpi-box"><div class="kpi-label">Completed Sweeps</div><div class="kpi-val">${st.k}</div></div>
+      <div class="kpi-box"><div class="kpi-label">Latest Δ<sub>k</sub></div><div class="kpi-val">${fmtDelta(lastDelta)}</div></div>
+      <div class="kpi-box"><div class="kpi-label">Backup Mode</div><div class="kpi-val" style="font-size:13px;">${st.mode === 'sync' ? 'Two-Array Sync' : 'One-Array In-Place'}</div></div>
+    `;
+
+    let tHtml = `<table><thead><tr>
+      <th>State s</th><th>π(s)</th><th style="text-align:right;">V<sub>old</sub>(s)</th>
+      <th style="text-align:right;">V<sub>new</sub>(s)</th><th style="text-align:right;">|V<sub>new</sub> − V<sub>old</sub>|</th>
+    </tr></thead><tbody>`;
+
+    for (let s = 0; s < N; s++) {
+      const oldV = st.k === 0 && st.subState === 0 ? 0 : st.V_old[s];
+      const hasNew = st.subState === 0 ? st.k > 0 : st.updatedInSweep[s];
+      const newV = st.mode === 'sync' ? (st.subState > 0 ? st.V_next[s] : st.V_curr[s]) : st.V_curr[s];
+      const diff = hasNew ? Math.abs(newV - oldV) : null;
+      const isFresh = st.mode === 'inplace' && st.subState > 0 && st.updatedInSweep[s];
+      const rowCls = (st.selectedState === s ? 'row-selected ' : '') + 'clickable-row';
+
+      tHtml += `<tr class="${rowCls}" data-eval-row="${s}">
+        <td><strong>${escHtml(app.mdp.states[s])}</strong> ${isFresh ? '<span class="pill pill-fresh">FRESH</span>' : ''}</td>
+        <td><span class="pill pill-pol">${escHtml(app.mdp.actions[st.policy[s]])}</span></td>
+        <td class="num-cell">${fmt(oldV)}</td>
+        <td class="num-cell ${hasNew ? (isFresh ? 'cell-fresh' : 'cell-val') : ''}">${hasNew ? fmt(newV) : '—'}</td>
+        <td class="num-cell">${diff !== null ? fmt(diff) : '—'}</td>
+      </tr>`;
+    }
+    tHtml += `</tbody></table>`;
+    const vt = document.getElementById('evalValueTable');
+    vt.innerHTML = tHtml;
+    vt.querySelectorAll('tr[data-eval-row]').forEach(tr => {
+      tr.addEventListener('click', () => {
+        st.selectedState = Number(tr.dataset.evalRow);
+        renderTab2();
+      });
+    });
+
+    // State selector pills for Glass-Box Inspector
+    const pills = document.getElementById('evalInspectStatePills');
+    pills.innerHTML = app.mdp.states.map((name, s) => `
+      <button class="btn btn-sm ${st.selectedState === s ? 'btn-primary' : ''}" data-insp-s="${s}">s<sub>${s}</sub></button>
+    `).join('');
+    pills.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        st.selectedState = Number(btn.dataset.inspS);
+        renderTab2();
+      });
+    });
+
+    renderEvalGlassBox();
+    renderEvalChart();
+  }
+
+  function renderEvalGlassBox() {
+    const st = app.evalState;
+    const box = document.getElementById('evalGlassBox');
+
+    // Symbolic header
+    let html = `
+      <div class="eq-banner">
+        <span class="tok tok-v">V<sub>k+1</sub>(s)</span> =
+        ∑<sub>a</sub> <span class="tok tok-pol">π(a | s)</span>
+        [ <span class="tok tok-r">R(s, a)</span> + γ ∑<sub>s′</sub>
+        <span class="tok tok-p">P(s′ | s, a)</span> · <span class="tok tok-v">V<sub>k</sub>(s′)</span> ]
+      </div>`;
+
+    // Determine what data to display: active quiz, last step if matching selectedState, or live preview of selectedState
+    let s = st.selectedState;
+    let branches, isQuiz = false, finalVal = null, caption = '';
+
+    if (st.quizPending && st.quizPending.stateIdx === s) {
+      isQuiz = true;
+      branches = st.quizPending.branches;
+      finalVal = st.quizPending.expectedVal;
+      caption = `Predict-It Quiz — Calculate Sweep ${st.k + 1} update for <strong>${escHtml(app.mdp.states[s])}</strong> (${st.mode === 'inplace' ? 'In-Place' : 'Synchronous'}):`;
+    } else if (st.lastStepInfo && st.lastStepInfo.s === s) {
+      branches = st.lastStepInfo.branches;
+      finalVal = st.lastStepInfo.newVal;
+      caption = `Showing Sweep ${st.lastStepInfo.sweepNum} calculation for <strong>${escHtml(app.mdp.states[s])}</strong> (${st.lastStepInfo.mode === 'inplace' ? 'In-Place' : 'Synchronous'}):`;
+    } else {
+      // Live preview of next update for selectedState using current source vector
+      const sourceVec = st.mode === 'inplace' ? st.V_curr : (st.subState > 0 ? st.V_old : st.V_curr);
+      const freshFlags = st.mode === 'inplace' && st.subState > 0 ? st.updatedInSweep : Array(app.mdp.states.length).fill(false);
+      branches = app.mdp.actions.map((_, a) => ({
+        weight: st.policy[s] === a ? 1.0 : 0.0,
+        detail: computeActionBranch(s, a, sourceVec, freshFlags)
+      }));
+      finalVal = branches.reduce((acc, b) => acc + b.weight * b.detail.total, 0);
+      caption = `Live Preview — Next backup for <strong>${escHtml(app.mdp.states[s])}</strong> using current ${st.mode === 'inplace' ? 'In-Place' : 'Synchronous'} array:`;
+    }
+
+    document.getElementById('evalInspectorSubtitle').innerHTML = caption;
+
+    branches.forEach(b => {
+      const d = b.detail;
+      const isAct = b.weight > 0;
+      const termHtml = d.terms.map(t => {
+        const vCls = t.isFresh ? 'tok-fresh' : 'tok-v';
+        const freshTag = t.isFresh ? ' <span class="pill pill-fresh" style="font-size:10px;padding:0 4px;">FRESH</span>' : '';
+        return `<span class="tok tok-p">${fmtShort(t.p)}</span>·<span class="tok ${vCls}">${fmt(t.v, 2)}</span>${freshTag}`;
+      }).join(' + ');
+
+      html += `
+        <div class="branch-box ${isAct ? 'branch-active' : 'branch-zero'}">
+          <div class="branch-head">
+            <span>Action: ${escHtml(app.mdp.actions[d.a])}</span>
+            <span class="pill ${isAct ? 'pill-pol' : 'pill-muted'}">π(${escHtml(app.mdp.actions[d.a])} | s<sub>${s}</sub>) = ${b.weight.toFixed(1)}</span>
+          </div>
+          <div class="formula-line">
+            <span class="tok tok-pol">${b.weight.toFixed(1)}</span> × [
+            <span class="tok tok-r">${fmtShort(d.r)}</span> +
+            <span class="mono">${app.gamma.toFixed(2)}</span> × ( ${termHtml} ) ]
+          </div>`;
+
+      if (isAct && !isQuiz) {
+        html += `
+          <div class="reduction-steps">
+            <div class="red-step"><span>(A) Expected next-state value ∑ P(s′|s,a)·V(s′)</span><span class="mono">${fmt(d.expNext)}</span></div>
+            <div class="red-step"><span>(B) Discounted future value (γ = ${app.gamma.toFixed(2)})</span><span class="mono">${fmt(d.disc)}</span></div>
+            <div class="red-step red-step-final"><span>(C) Immediate Reward (${fmtShort(d.r)}) + Discounted Future</span><span class="mono">${fmt(d.total)}</span></div>
+          </div>`;
+      } else if (!isAct) {
+        html += `<div style="font-size:11.5px;color:var(--muted);margin-top:4px;">Weight is 0.0 under deterministic policy π — contributes <strong>0.0000</strong> to V<sub>k+1</sub>(${escHtml(app.mdp.states[s])}).</div>`;
+      }
+      html += `</div>`;
+    });
+
+    if (isQuiz) {
+      const q = st.quizPending;
+      html += `
+        <div class="quiz-box">
+          <div style="font-weight:700;color:var(--c-pol);">Predict-It Challenge: Compute V<sub>${st.k + 1}</sub>(${escHtml(app.mdp.states[s])}) by hand!</div>
+          <div class="quiz-row">
+            <input type="number" step="0.01" id="evalQuizInput" placeholder="Your answer (e.g. 16.08)" style="width:170px;">
+            <button class="btn btn-purple btn-sm" id="btnEvalQuizCheck">Check Answer</button>
+            <button class="btn btn-sm" id="btnEvalQuizReveal">Reveal &amp; Continue</button>
+          </div>
+          ${q.feedback ? `<div style="margin-top:8px;font-size:12.5px;">${q.feedback}</div>` : ''}
+        </div>`;
+    } else {
+      html += `
+        <div class="callout callout-green" style="display:flex;justify-content:space-between;align-items:center;">
+          <span><strong>Result for ${escHtml(app.mdp.states[s])}:</strong></span>
+          <span class="tok tok-v" style="font-size:14px;">V = ${fmt(finalVal)}</span>
+        </div>`;
+    }
+
+    box.innerHTML = html;
+
+    if (isQuiz) {
+      const activeBranch = st.quizPending.branches.find(b => b.weight > 0).detail;
+      document.getElementById('btnEvalQuizCheck').addEventListener('click', () => {
+        const val = parseFloat(document.getElementById('evalQuizInput').value);
+        if (Number.isNaN(val)) {
+          st.quizPending.feedback = `<span style="color:var(--c-danger);font-weight:600;">Please enter a number first.</span>`;
+        } else if (Math.abs(val - finalVal) <= 0.02) {
+          st.quizPending.feedback = `<span style="color:var(--c-val);font-weight:700;">Correct! Exact value is ${fmt(finalVal)}. Click "Reveal & Continue" to commit this update.</span>`;
+          st.quizPending.solved = true;
+        } else {
+          st.quizPending.feedback = `<span style="color:var(--c-danger);font-weight:600;">Not quite (off by ${fmt(Math.abs(val - finalVal), 2)}).</span>
+            <div style="margin-top:4px;color:var(--ink);">Hint: First compute expected next value = <strong>${fmt(activeBranch.expNext)}</strong>, multiply by γ=${app.gamma.toFixed(2)} to get <strong>${fmt(activeBranch.disc)}</strong>, then add R=${fmtShort(activeBranch.r)}.</div>`;
+        }
+        renderEvalGlassBox();
+      });
+      document.getElementById('btnEvalQuizReveal').addEventListener('click', () => {
+        evalStepSingleState(true);
+      });
+    }
+  }
+
+  function renderEvalChart() {
+    const st = app.evalState;
+    const pts = st.history.filter(h => h.delta !== null).map(h => ({ k: h.k, y: h.delta }));
+    const envPts = [];
+    if (pts.length > 0 && app.gamma > 0) {
+      const d1 = pts[0].y;
+      pts.forEach(p => {
+        envPts.push({ k: p.k, y: d1 * Math.pow(app.gamma, p.k - 1) });
+      });
+    }
+    renderContractionChartSVG(document.getElementById('evalChartStage'), {
+      series: [{
+        label: st.mode === 'sync' ? 'Synchronous Δk' : 'In-Place Δk',
+        color: st.mode === 'sync' ? '#0969DA' : '#0F766E',
+        points: pts
+      }],
+      theoreticalEnv: {
+        label: `Theoretical γ^(k-1)·Δ₁ (γ=${app.gamma.toFixed(2)})`,
+        color: '#94A3B8',
+        dashed: true,
+        points: envPts
+      },
+      theta: app.theta,
+      logScale: app.evalChartScale === 'log'
+    });
+  }
+
+  /* ========================================================================
+     9. TAB 3: VECTORIZED MATRIX VIEW
+     ======================================================================== */
+  function vecStepSweep() {
+    if (!validateMDP().valid) return;
+    const vs = app.vecState;
+    const N = app.mdp.states.length;
+    const { rPi, PPi } = buildInducedMatrices(vs.policy);
+
+    const Pv = zeros(N);
+    const gPv = zeros(N);
+    const vNext = zeros(N);
+
+    for (let i = 0; i < N; i++) {
+      let dot = 0;
+      for (let j = 0; j < N; j++) dot += PPi[i][j] * vs.v_curr[j];
+      Pv[i] = dot;
+      gPv[i] = app.gamma * dot;
+      vNext[i] = rPi[i] + gPv[i];
+    }
+
+    vs.v_prev = [...vs.v_curr];
+    vs.Pv = Pv;
+    vs.gPv = gPv;
+    vs.delta = maxNormDiff(vNext, vs.v_curr);
+    vs.v_curr = vNext;
+    vs.k++;
+    if (vs.delta < app.theta) vs.converged = true;
+    renderTab3();
+  }
+
+  function vecRunToConvergence() {
+    if (!validateMDP().valid) return;
+    const vs = app.vecState;
+    let guard = 0;
+    while (!vs.converged && vs.k < MAX_SWEEPS && guard < MAX_SWEEPS) {
+      const N = app.mdp.states.length;
+      const { rPi, PPi } = buildInducedMatrices(vs.policy);
+      const Pv = zeros(N), gPv = zeros(N), vNext = zeros(N);
+      for (let i = 0; i < N; i++) {
+        let dot = 0;
+        for (let j = 0; j < N; j++) dot += PPi[i][j] * vs.v_curr[j];
+        Pv[i] = dot;
+        gPv[i] = app.gamma * dot;
+        vNext[i] = rPi[i] + gPv[i];
+      }
+      vs.v_prev = [...vs.v_curr];
+      vs.Pv = Pv;
+      vs.gPv = gPv;
+      vs.delta = maxNormDiff(vNext, vs.v_curr);
+      vs.v_curr = vNext;
+      vs.k++;
+      if (vs.delta < app.theta) vs.converged = true;
+      guard++;
+    }
+    renderTab3();
+  }
+
+  function renderMatrixBlockHtml(titleHtml, shapeText, rows, cols, data, cellClass, hoverPrefix, hlRow = -1, hlAll = false) {
+    let gridStyle = `grid-template-columns: repeat(${cols}, minmax(56px, auto));`;
+    let cells = '';
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const val = cols === 1 ? data[r] : data[r][c];
+        const cls = [
+          'mat-cell',
+          cellClass,
+          hlRow === r ? 'hl-row' : '',
+          hlAll ? 'hl-vec' : ''
+        ].join(' ');
+        cells += `<div class="${cls}" data-vec-row="${r}" data-mat="${hoverPrefix}">${fmt(val, cols === 1 ? 2 : 2)}</div>`;
+      }
+    }
+    return `
+      <div class="mat-block">
+        <div class="mat-label">${titleHtml} <span class="shape-tag">${shapeText}</span></div>
+        <div class="mat-bracket"><div class="mat-grid" style="${gridStyle}">${cells}</div></div>
+      </div>`;
+  }
+
+  function renderTab3() {
+    const vs = app.vecState;
+    const N = app.mdp.states.length;
+    const valid = validateMDP().valid;
+    const { rPi, PPi } = buildInducedMatrices(vs.policy);
+
+    document.getElementById('btnVecStep').disabled = !valid;
+    document.getElementById('btnVecRun').disabled = !valid;
+
+    renderPolicySelectorBar(document.getElementById('vecPolicyBar'), vs.policy, (s, a) => {
+      app.evalState.policy[s] = a;
+      resetEvalState(false);
+      resetVecState();
+      renderTab3();
+    });
+
+    // Display vectors for equation v_{k+1} = r^pi + gamma P^pi v_k
+    // If k == 0, preview v_1 from v_0; else show last step v_k = r + gamma P v_{k-1}
+    const vIn = vs.k === 0 ? vs.v_curr : vs.v_prev;
+    const kIn = vs.k === 0 ? 0 : vs.k - 1;
+    const Pv = vs.k === 0 ? PPi.map(row => row.reduce((acc, p, j) => acc + p * vIn[j], 0)) : vs.Pv;
+    const gPv = Pv.map(x => app.gamma * x);
+    const vOut = vs.k === 0 ? rPi.map((r, i) => r + gPv[i]) : vs.v_curr;
+
+    const hr = vs.hoveredRow;
+
+    let stageHtml = `
+      <div class="kpi-strip">
+        <div class="kpi-box"><div class="kpi-label">Completed Sweeps</div><div class="kpi-val">${vs.k}</div></div>
+        <div class="kpi-box"><div class="kpi-label">Latest Δ<sub>k</sub></div><div class="kpi-val">${fmtDelta(vs.delta)}</div></div>
+        <div class="kpi-box"><div class="kpi-label">Status</div><div class="kpi-val" style="font-size:13px;color:${vs.converged ? 'var(--c-val)' : 'var(--ink)'};">${vs.converged ? 'Converged (< θ)' : (vs.k === 0 ? 'Previewing Sweep 1' : 'Iterating')}</div></div>
+      </div>
+      <div class="matrix-eq-stage" id="vecEqGrid">
+        ${renderMatrixBlockHtml(`v<sub>${kIn + 1}</sub>`, `(${N}×1)`, N, 1, vOut, 'cell-val', 'vout', hr, false)}
+        <span class="mat-op">=</span>
+        ${renderMatrixBlockHtml(`r<sup>π</sup>`, `(${N}×1)`, N, 1, rPi, 'cell-reward', 'r', hr, false)}
+        <span class="mat-op">+ ${app.gamma.toFixed(2)} ·</span>
+        ${renderMatrixBlockHtml(`P<sup>π</sup>`, `(${N}×${N})`, N, N, PPi, 'cell-prob', 'P', hr, false)}
+        ${renderMatrixBlockHtml(`v<sub>${kIn}</sub>`, `(${N}×1)`, N, 1, vIn, 'cell-val', 'vin', -1, hr >= 0)}
+      </div>
+      <div class="matrix-eq-stage" style="margin-top:10px;background:#F8FAFC;">
+        <span style="font-size:12px;font-weight:700;color:var(--muted);">INTERMEDIATE VECTORS:</span>
+        ${renderMatrixBlockHtml(`P<sup>π</sup>v<sub>${kIn}</sub>`, `(${N}×1)`, N, 1, Pv, 'cell-prob', 'Pv', hr, false)}
+        <span class="mat-op">× ${app.gamma.toFixed(2)} =</span>
+        ${renderMatrixBlockHtml(`γ P<sup>π</sup>v<sub>${kIn}</sub>`, `(${N}×1)`, N, 1, gPv, 'cell-pol', 'gPv', hr, false)}
+        <span class="mat-op">+ r<sup>π</sup> =</span>
+        ${renderMatrixBlockHtml(`v<sub>${kIn + 1}</sub>`, `(${N}×1)`, N, 1, vOut, 'cell-val', 'vout2', hr, false)}
+      </div>`;
+
+    const stage = document.getElementById('vecMatrixStage');
+    stage.innerHTML = stageHtml;
+
+    stage.querySelectorAll('.mat-cell').forEach(cell => {
+      cell.addEventListener('mouseenter', () => {
+        const r = Number(cell.dataset.vecRow);
+        if (vs.hoveredRow !== r) {
+          vs.hoveredRow = r;
+          renderTab3();
+        }
+      });
+    });
+
+    // Row Dot-Product Inspector
+    const dotTerms = PPi[hr].map((p, j) => `<span class="tok tok-p">${fmtShort(p)}</span>·<span class="tok tok-v">${fmt(vIn[j], 2)}</span>`).join(' + ');
+    document.getElementById('vecRowInspector').innerHTML = `
+      <div><strong>Row ${hr} Dot-Product Trace — ${escHtml(app.mdp.states[hr])}</strong> (Action: <span class="pill pill-pol">${escHtml(app.mdp.actions[vs.policy[hr]])}</span>):</div>
+      <div class="formula-line" style="margin-top:6px;">
+        v<sub>${kIn + 1}</sub>[${hr}] = <span class="tok tok-r">${fmtShort(rPi[hr])}</span> + ${app.gamma.toFixed(2)} × ( ${dotTerms} )
+        = <span class="tok tok-r">${fmtShort(rPi[hr])}</span> + ${app.gamma.toFixed(2)} × <span class="tok tok-p">${fmt(Pv[hr])}</span>
+        = <span class="tok tok-r">${fmtShort(rPi[hr])}</span> + <span class="tok tok-pol">${fmt(gPv[hr])}</span>
+        = <span class="tok tok-v">${fmt(vOut[hr])}</span>
+      </div>`;
+
+    // Exact Matrix Inverse Panel
+    const exactPanel = document.getElementById('vecExactPanel');
+    if (!vs.showExact) {
+      exactPanel.innerHTML = `<p style="margin:0;font-size:12.5px;color:var(--muted);">Click <strong>"Compare with Exact Matrix Inverse"</strong> above to solve <span class="math">(I − γ P<sup>π</sup>)<sup>−1</sup> r<sup>π</sup></span> directly via Gaussian elimination and compare error &amp; FLOPs scaling.</p>`;
+    } else if (!valid) {
+      exactPanel.innerHTML = `<div class="callout callout-amber">Fix invalid transition rows in Tab 1 first.</div>`;
+    } else {
+      const exactV = solveExactPolicyValue(vs.policy);
+      if (!exactV) {
+        exactPanel.innerHTML = `<div class="callout callout-amber">Matrix (I − γ P<sup>π</sup>) is singular for γ = ${app.gamma.toFixed(2)}.</div>`;
+      } else {
+        const err = maxNormDiff(vs.v_curr, exactV);
+        let tbl = `<div class="tbl-wrap"><table><thead><tr>
+          <th>State s</th><th style="text-align:right;">Iterative v<sub>${vs.k}</sub>(s)</th>
+          <th style="text-align:right;">Exact (I − γ P<sup>π</sup>)<sup>−1</sup> r<sup>π</sup></th>
+          <th style="text-align:right;">|Error|</th>
+        </tr></thead><tbody>`;
+        for (let s = 0; s < N; s++) {
+          tbl += `<tr>
+            <td><strong>${escHtml(app.mdp.states[s])}</strong></td>
+            <td class="num-cell">${fmt(vs.v_curr[s], 6)}</td>
+            <td class="num-cell cell-val">${fmt(exactV[s], 6)}</td>
+            <td class="num-cell">${fmtDelta(Math.abs(vs.v_curr[s] - exactV[s]))}</td>
+          </tr>`;
+        }
+        tbl += `</tbody></table></div>`;
+        tbl += `
+          <div class="callout callout-blue" style="margin-top:10px;">
+            <strong>Live Max-Norm Error ‖v<sub>${vs.k}</sub> − v<sup>π</sup>‖<sub>∞</sub> = ${fmtDelta(err)}</strong><br>
+            <span style="font-size:12px;"><strong>Complexity Note (Byte 10 &amp; 13):</strong> On this tiny N = ${N} MDP, exact matrix inversion costs O(N³) ≈ ${N ** 3} ops—instant! At N = 10,000 states, exact inversion explodes to O(N³) = 10¹² FLOPs, whereas one sparse iterative sweep costs O(N·b) ≈ 5×10⁴ FLOPs.</span>
+          </div>`;
+        exactPanel.innerHTML = tbl;
+      }
+    }
+  }
+
+  /* ========================================================================
+     10. TAB 4: POLICY ITERATION (CONTROL)
+     ======================================================================== */
+  function runSyncPolicyEvalFast(policy) {
+    const N = app.mdp.states.length;
+    const { rPi, PPi } = buildInducedMatrices(policy);
+    let V = zeros(N);
+    let sweeps = 0;
+    const deltas = [];
+    while (sweeps < MAX_SWEEPS) {
+      const Vnext = zeros(N);
+      for (let i = 0; i < N; i++) {
+        let dot = 0;
+        for (let j = 0; j < N; j++) dot += PPi[i][j] * V[j];
+        Vnext[i] = rPi[i] + app.gamma * dot;
+      }
+      const delta = maxNormDiff(Vnext, V);
+      V = Vnext;
+      sweeps++;
+      deltas.push({ k: sweeps, y: delta });
+      if (delta < app.theta) break;
+    }
+    return { V, sweeps, deltas };
+  }
+
+  function runInPlacePolicyEvalFast(policy) {
+    const N = app.mdp.states.length;
+    const { rPi, PPi } = buildInducedMatrices(policy);
+    const V = zeros(N);
+    let sweeps = 0;
+    const deltas = [];
+    while (sweeps < MAX_SWEEPS) {
+      let delta = 0;
+      for (let i = 0; i < N; i++) {
+        const old = V[i];
+        let dot = 0;
+        for (let j = 0; j < N; j++) dot += PPi[i][j] * V[j];
+        V[i] = rPi[i] + app.gamma * dot;
+        delta = Math.max(delta, Math.abs(V[i] - old));
+      }
+      sweeps++;
+      deltas.push({ k: sweeps, y: delta });
+      if (delta < app.theta) break;
+    }
+    return { V, sweeps, deltas };
+  }
+
+  function piStepEvaluate() {
+    if (!validateMDP().valid) return;
+    const pi = app.piState;
+    const { V, sweeps } = runSyncPolicyEvalFast(pi.policy);
+    pi.V = V;
+    pi.evalSweeps = sweeps;
+    pi.Q = null;
+    pi.greedyPolicy = null;
+    pi.phase = 'evaluated';
+    renderTab4();
+  }
+
+  function piStepLookahead() {
+    if (!validateMDP().valid) return;
+    const pi = app.piState;
+    if (pi.phase === 'ready_eval') piStepEvaluate();
+    const N = app.mdp.states.length;
+    const A = app.mdp.actions.length;
+    const Q = Array.from({ length: N }, () => zeros(A));
+    const greedy = zeros(N);
+
+    for (let s = 0; s < N; s++) {
+      for (let a = 0; a < A; a++) {
+        Q[s][a] = computeActionBranch(s, a, pi.V).total;
+      }
+      // Tie-break in favor of current action pi.policy[s]
+      let bestA = pi.policy[s];
+      let bestVal = Q[s][bestA];
+      for (let a = 0; a < A; a++) {
+        if (Q[s][a] > bestVal + TIE_EPS) {
+          bestVal = Q[s][a];
+          bestA = a;
+        }
+      }
+      greedy[s] = bestA;
+    }
+
+    pi.Q = Q;
+    pi.greedyPolicy = greedy;
+    pi.phase = 'lookahead_done';
+    renderTab4();
+  }
+
+  function piStepImprove() {
+    if (!validateMDP().valid) return;
+    const pi = app.piState;
+    if (pi.phase !== 'lookahead_done') piStepLookahead();
+    const N = app.mdp.states.length;
+
+    const stable = pi.greedyPolicy.every((a, s) => a === pi.policy[s]);
+    const prevLog = pi.log.length > 0 ? pi.log[pi.log.length - 1] : null;
+    const improvedAll = prevLog ? pi.V.every((v, s) => v >= prevLog.V[s] - 1e-7) : true;
+
+    pi.log.push({
+      m: pi.m,
+      policy: [...pi.policy],
+      evalSweeps: pi.evalSweeps,
+      V: [...pi.V],
+      improvedAll,
+      nextPolicy: [...pi.greedyPolicy],
+      stable
+    });
+
+    if (stable) {
+      pi.phase = 'converged';
+      renderTab4();
+      return;
+    }
+
+    const oldMats = buildInducedMatrices(pi.policy);
+    const newMats = buildInducedMatrices(pi.greedyPolicy);
+    const changedStates = [];
+    for (let s = 0; s < N; s++) {
+      if (pi.policy[s] !== pi.greedyPolicy[s]) changedStates.push(s);
+    }
+
+    pi.lastDiff = {
+      mOld: pi.m,
+      mNew: pi.m + 1,
+      oldPolicy: [...pi.policy],
+      newPolicy: [...pi.greedyPolicy],
+      oldR: oldMats.rPi,
+      newR: newMats.rPi,
+      oldP: oldMats.PPi,
+      newP: newMats.PPi,
+      changedStates
+    };
+
+    pi.policy = [...pi.greedyPolicy];
+    pi.m++;
+    pi.phase = 'ready_eval';
+    pi.Q = null;
+    pi.greedyPolicy = null;
+    renderTab4();
+  }
+
+  function piRunFull() {
+    if (!validateMDP().valid) return;
+    let guard = 0;
+    while (app.piState.phase !== 'converged' && guard < 30) {
+      if (app.piState.phase === 'ready_eval') piStepEvaluate();
+      if (app.piState.phase === 'evaluated') piStepLookahead();
+      if (app.piState.phase === 'lookahead_done') piStepImprove();
+      guard++;
+    }
+  }
+
+  function renderTab4() {
+    const pi = app.piState;
+    const N = app.mdp.states.length;
+    const A = app.mdp.actions.length;
+    const valid = validateMDP().valid;
+
+    document.getElementById('btnPiEval').disabled = !valid || pi.phase !== 'ready_eval';
+    document.getElementById('btnPiLookahead').disabled = !valid || pi.phase !== 'evaluated';
+    document.getElementById('btnPiImprove').disabled = !valid || pi.phase !== 'lookahead_done';
+    document.getElementById('btnPiRunFull').disabled = !valid || pi.phase === 'converged';
+
+    document.getElementById('piIterBadge').textContent = `Outer Iter m = ${pi.m}`;
+
+    const badge = document.getElementById('piStatusBadge');
+    if (pi.phase === 'converged') {
+      badge.innerHTML = `<span class="pill pill-val">Optimal Policy Found! π* = (${pi.policy.map(a => escHtml(app.mdp.actions[a])).join(', ')})</span>`;
+    } else if (pi.phase === 'ready_eval') {
+      badge.innerHTML = `<span class="pill pill-muted">Step 1: Evaluate π<sub>${pi.m}</sub> = (${pi.policy.map(a => escHtml(app.mdp.actions[a])).join(', ')})</span>`;
+    } else if (pi.phase === 'evaluated') {
+      badge.innerHTML = `<span class="pill pill-reward">Evaluated in ${pi.evalSweeps} sweeps — Next: Compute Lookahead Q</span>`;
+    } else {
+      badge.innerHTML = `<span class="pill pill-pol">Lookahead Ready — Next: Improve Policy</span>`;
+    }
+
+    // Lookahead Q Table
+    let qHtml = `<table><thead><tr>
+      <th>State s</th><th>Current π<sub>${pi.m}</sub>(s)</th><th style="text-align:right;">V<sup>π<sub>${pi.m}</sub></sup>(s)</th>`;
+    for (let a = 0; a < A; a++) {
+      qHtml += `<th style="text-align:right;">Q(s, ${escHtml(app.mdp.actions[a])})</th>`;
+    }
+    qHtml += `<th>Greedy argmax</th></tr></thead><tbody>`;
+
+    for (let s = 0; s < N; s++) {
+      const hasV = pi.phase !== 'ready_eval';
+      const hasQ = pi.Q !== null;
+      qHtml += `<tr>
+        <td><strong>${escHtml(app.mdp.states[s])}</strong></td>
+        <td><span class="pill pill-muted">${escHtml(app.mdp.actions[pi.policy[s]])}</span></td>
+        <td class="num-cell ${hasV ? 'cell-val' : ''}">${hasV ? fmt(pi.V[s]) : '—'}</td>`;
+      for (let a = 0; a < A; a++) {
+        const isBest = hasQ && pi.greedyPolicy[s] === a;
+        const isSel = pi.selectedQ.s === s && pi.selectedQ.a === a;
+        qHtml += `<td class="num-cell q-clickable ${isBest ? 'cell-pol' : ''}" style="${isSel ? 'outline:2px solid var(--c-reward);outline-offset:-2px;' : ''}" data-qs="${s}" data-qa="${a}">
+          ${hasQ ? fmt(pi.Q[s][a]) : '—'}
+        </td>`;
+      }
+      const changed = hasQ && pi.greedyPolicy[s] !== pi.policy[s];
+      qHtml += `<td>${hasQ ? `<span class="pill pill-pol">${escHtml(app.mdp.actions[pi.greedyPolicy[s]])}</span>${changed ? ' <span class="pill pill-fresh">SWITCH</span>' : ''}` : '—'}</td></tr>`;
+    }
+    qHtml += `</tbody></table>`;
+    const qWrap = document.getElementById('piQTable');
+    qWrap.innerHTML = qHtml;
+    qWrap.querySelectorAll('[data-qs]').forEach(td => {
+      td.addEventListener('click', () => {
+        pi.selectedQ = { s: Number(td.dataset.qs), a: Number(td.dataset.qa) };
+        renderTab4();
+      });
+    });
+
+    // Glass-Box Lookahead Inspector
+    const gBox = document.getElementById('piGlassBox');
+    if (pi.phase === 'ready_eval') {
+      gBox.innerHTML = `<div class="callout callout-blue">Click <strong>"1. Evaluate Current π<sub>${pi.m}</sub>"</strong> to compute V<sup>π<sub>${pi.m}</sub></sup> first, then compute Q<sup>π<sub>${pi.m}</sub></sup>(s, a) to inspect every lookahead cell.</div>`;
+    } else {
+      const s = Math.min(pi.selectedQ.s, N - 1);
+      const a = Math.min(pi.selectedQ.a, A - 1);
+      const d = computeActionBranch(s, a, pi.V);
+      const termHtml = d.terms.map(t => `<span class="tok tok-p">${fmtShort(t.p)}</span>·<span class="tok tok-v">${fmt(t.v, 4)}</span>`).join(' + ');
+      gBox.innerHTML = `
+        <div class="eq-banner">
+          <span class="tok tok-pol">Q<sup>π<sub>${pi.m}</sub></sup>(s, a)</span> =
+          <span class="tok tok-r">R(s, a)</span> + γ ∑<sub>s′</sub>
+          <span class="tok tok-p">P(s′ | s, a)</span> · <span class="tok tok-v">V<sup>π<sub>${pi.m}</sub></sup>(s′)</span>
+        </div>
+        <div class="branch-box branch-active">
+          <div class="branch-head">
+            <span>Inspecting (${escHtml(app.mdp.states[s])}, ${escHtml(app.mdp.actions[a])})</span>
+            ${pi.policy[s] === a ? '<span class="pill pill-muted">Current π action</span>' : '<span class="pill pill-pol">Alternative action</span>'}
+          </div>
+          <div class="formula-line">
+            Q = <span class="tok tok-r">${fmtShort(d.r)}</span> + ${app.gamma.toFixed(2)} × ( ${termHtml} )
+          </div>
+          <div class="reduction-steps">
+            <div class="red-step"><span>(A) Expected next-state value</span><span class="mono">${fmt(d.expNext)}</span></div>
+            <div class="red-step"><span>(B) Discounted by γ = ${app.gamma.toFixed(2)}</span><span class="mono">${fmt(d.disc)}</span></div>
+            <div class="red-step red-step-final"><span>(C) Q<sup>π<sub>${pi.m}</sub></sup>(s<sub>${s}</sub>, ${escHtml(app.mdp.actions[a])})</span><span class="mono">${fmt(d.total)}</span></div>
+          </div>
+        </div>
+        ${pi.policy[s] === a ? `<div class="callout callout-green" style="font-size:12px;">Sanity Check: Because <strong>${escHtml(app.mdp.actions[a])}</strong> is already π<sub>${pi.m}</sub>(${escHtml(app.mdp.states[s])}), Q(s, π(s)) = ${fmt(d.total)} matches V<sup>π<sub>${pi.m}</sub></sup>(s) = ${fmt(pi.V[s])}.</div>` : ''}`;
+    }
+
+    // Policy-Induced Matrix Diff
+    const diffEl = document.getElementById('piMatrixDiff');
+    if (!pi.lastDiff) {
+      diffEl.innerHTML = `<div class="callout">When you click <strong>"3. Improve Policy"</strong> and at least one state switches action, this panel compares the old vs. new policy-induced matrices <span class="math">P<sup>π</sup></span> and <span class="math">r<sup>π</sup></span> with swapped rows highlighted.</div>`;
+    } else {
+      const df = pi.lastDiff;
+      const changedSet = new Set(df.changedStates);
+      const renderMiniMat = (title, P, R) => {
+        let h = `<div style="flex:1;min-width:220px;"><div style="font-weight:700;font-size:12.5px;margin-bottom:6px;">${title}</div>
+          <div class="tbl-wrap"><table><thead><tr><th>s</th><th style="text-align:right;">r<sup>π</sup></th>`;
+        for (let sp = 0; sp < N; sp++) h += `<th style="text-align:right;">s<sub>${sp}</sub></th>`;
+        h += `</tr></thead><tbody>`;
+        for (let s = 0; s < N; s++) {
+          const ch = changedSet.has(s);
+          h += `<tr style="${ch ? 'background:var(--bg-fresh);' : ''}">
+            <td><strong>s<sub>${s}</sub></strong> ${ch ? '<span class="pill pill-fresh" style="font-size:10px;padding:0 4px;">SWAPPED</span>' : ''}</td>
+            <td class="num-cell ${ch ? 'cell-fresh' : 'cell-reward'}">${fmtShort(R[s])}</td>`;
+          for (let sp = 0; sp < N; sp++) {
+            h += `<td class="num-cell ${ch ? 'cell-fresh' : ''}">${fmtShort(P[s][sp])}</td>`;
+          }
+          h += `</tr>`;
+        }
+        h += `</tbody></table></div></div>`;
+        return h;
+      };
+      diffEl.innerHTML = `
+        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;">
+          ${renderMiniMat(`Old Policy π<sub>${df.mOld}</sub> (${df.oldPolicy.map(a => escHtml(app.mdp.actions[a])).join(', ')})`, df.oldP, df.oldR)}
+          ${renderMiniMat(`New Policy π<sub>${df.mNew}</sub> (${df.newPolicy.map(a => escHtml(app.mdp.actions[a])).join(', ')})`, df.newP, df.newR)}
+        </div>
+        <div class="callout callout-purple">
+          <strong>Key Distinction (Byte 14):</strong> The underlying environment physics <span class="math">P(s′ | s, a)</span> in Tab 1 stayed 100% frozen. Updating the policy simply changed <em>which action's row</em> is pulled into <span class="math">P<sup>π</sup></span> and <span class="math">r<sup>π</sup></span> for state(s): <strong>${df.changedStates.map(s => escHtml(app.mdp.states[s])).join(', ')}</strong>.
+        </div>`;
+    }
+
+    // Policy Improvement Theorem Verification Log
+    const logEl = document.getElementById('piLogTable');
+    if (pi.log.length === 0) {
+      logEl.innerHTML = `<div style="padding:14px;font-size:12.5px;color:var(--muted);">No completed outer iterations yet. Complete steps 1 → 2 → 3 to log outer iteration m = 0.</div>`;
+    } else {
+      let lHtml = `<table><thead><tr>
+        <th>Iter m</th><th>Policy π<sub>m</sub></th><th style="text-align:right;">Eval Sweeps</th>
+        <th>Evaluated V<sup>π<sub>m</sub></sup></th><th>V<sup>π<sub>m</sub></sup> ≥ V<sup>π<sub>m−1</sub></sup>?</th><th>Status</th>
+      </tr></thead><tbody>`;
+      pi.log.forEach(entry => {
+        lHtml += `<tr>
+          <td class="mono"><strong>${entry.m}</strong></td>
+          <td>(${entry.policy.map(a => escHtml(app.mdp.actions[a])).join(', ')})</td>
+          <td class="num-cell">${entry.evalSweeps}</td>
+          <td class="mono" style="font-size:11.5px;">[${entry.V.map(v => fmt(v, 3)).join(', ')}]</td>
+          <td>${entry.m === 0 ? '<span class="pill pill-muted">Baseline</span>' : (entry.improvedAll ? '<span class="pill pill-val">✓ Verified</span>' : '<span class="pill pill-danger">Check</span>')}</td>
+          <td>${entry.stable ? '<span class="pill pill-val">Stable — π*!</span>' : '<span class="pill pill-pol">Improved → π<sub>' + (entry.m + 1) + '</sub></span>'}</td>
+        </tr>`;
+      });
+      lHtml += `</tbody></table>`;
+      logEl.innerHTML = lHtml;
+    }
+  }
+
+  /* ========================================================================
+     11. TAB 5: VALUE ITERATION & 4-WAY ALGORITHM RACE
+     ======================================================================== */
+  function viStepSingleState(bypassQuiz = false) {
+    if (!validateMDP().valid) return;
+    const vi = app.viState;
+    const N = app.mdp.states.length;
+    const A = app.mdp.actions.length;
+
+    if (vi.subState === 0) {
+      vi.V_old = [...vi.V_next];
+      vi.updatedInSweep = Array(N).fill(false);
+    }
+
+    const s = vi.subState;
+    const branches = [];
+    let bestA = 0;
+    let bestVal = -Infinity;
+    for (let a = 0; a < A; a++) {
+      const d = computeActionBranch(s, a, vi.V_old);
+      branches.push(d);
+      if (d.total > bestVal + TIE_EPS) {
+        bestVal = d.total;
+        bestA = a;
+      }
+    }
+
+    if (app.quizMode && !bypassQuiz) {
+      vi.selectedState = s;
+      vi.quizPending = {
+        stateIdx: s,
+        expectedVal: bestVal,
+        bestA,
+        branches,
+        feedback: null
+      };
+      renderTab5();
+      return;
+    }
+
+    vi.quizPending = null;
+    for (let a = 0; a < A; a++) vi.Q_curr[s][a] = branches[a].total;
+    vi.V_next[s] = bestVal;
+    vi.greedyPolicy[s] = bestA;
+    vi.updatedInSweep[s] = true;
+    vi.selectedState = s;
+    vi.lastStepInfo = { s, sweepNum: vi.k + 1, branches, bestA, bestVal, oldVal: vi.V_old[s] };
+
+    vi.subState++;
+    if (vi.subState >= N) {
+      const delta = maxNormDiff(vi.V_next, vi.V_old);
+      vi.k++;
+      vi.subState = 0;
+      vi.history.push({ k: vi.k, V: [...vi.V_next], delta, greedyPolicy: [...vi.greedyPolicy] });
+      if (delta < app.theta) vi.converged = true;
+    }
+    renderTab5();
+  }
+
+  function viStepSweep() {
+    if (!validateMDP().valid) return;
+    const vi = app.viState;
+    const N = app.mdp.states.length;
+    vi.quizPending = null;
+    const rem = N - vi.subState;
+    for (let i = 0; i < rem; i++) viStepSingleState(true);
+  }
+
+  function viRunToConvergence() {
+    if (!validateMDP().valid) return;
+    const vi = app.viState;
+    vi.quizPending = null;
+    if (vi.subState > 0) viStepSweep();
+    let guard = 0;
+    while (!vi.converged && vi.k < MAX_SWEEPS && guard < MAX_SWEEPS) {
+      const N = app.mdp.states.length;
+      const A = app.mdp.actions.length;
+      vi.V_old = [...vi.V_next];
+      vi.updatedInSweep = Array(N).fill(false);
+      let lastInfo = null;
+      for (let s = 0; s < N; s++) {
+        const branches = [];
+        let bestA = 0, bestVal = -Infinity;
+        for (let a = 0; a < A; a++) {
+          const d = computeActionBranch(s, a, vi.V_old);
+          branches.push(d);
+          vi.Q_curr[s][a] = d.total;
+          if (d.total > bestVal + TIE_EPS) {
+            bestVal = d.total;
+            bestA = a;
+          }
+        }
+        vi.V_next[s] = bestVal;
+        vi.greedyPolicy[s] = bestA;
+        vi.updatedInSweep[s] = true;
+        if (s === vi.selectedState || s === N - 1) {
+          lastInfo = { s, sweepNum: vi.k + 1, branches, bestA, bestVal, oldVal: vi.V_old[s] };
+        }
+      }
+      const delta = maxNormDiff(vi.V_next, vi.V_old);
+      vi.k++;
+      vi.history.push({ k: vi.k, V: [...vi.V_next], delta, greedyPolicy: [...vi.greedyPolicy] });
+      vi.lastStepInfo = lastInfo;
+      if (delta < app.theta) vi.converged = true;
+      guard++;
+    }
+    renderTab5();
+  }
+
+  function findGreedyStabilizationSweep(history) {
+    const validEntries = history.filter(h => h.greedyPolicy !== null);
+    if (validEntries.length === 0) return null;
+    const finalPol = validEntries[validEntries.length - 1].greedyPolicy;
+    let firstStableK = validEntries[validEntries.length - 1].k;
+    for (let i = validEntries.length - 1; i >= 0; i--) {
+      const same = validEntries[i].greedyPolicy.every((a, s) => a === finalPol[s]);
+      if (same) firstStableK = validEntries[i].k;
+      else break;
+    }
+    return firstStableK;
+  }
+
+  function renderTab5() {
+    const vi = app.viState;
+    const N = app.mdp.states.length;
+    const A = app.mdp.actions.length;
+    const valid = validateMDP().valid;
+
+    document.getElementById('btnViStepState').disabled = !valid || vi.quizPending !== null;
+    document.getElementById('btnViStepSweep').disabled = !valid;
+    document.getElementById('btnViRunAll').disabled = !valid;
+    document.getElementById('btnRunRace').disabled = !valid;
+
+    document.getElementById('viSweepBadge').textContent = `Sweep k = ${vi.k}${vi.subState > 0 ? ` (+${vi.subState}/${N})` : ''}`;
+
+    const lastDelta = vi.history[vi.history.length - 1].delta;
+    const stabK = findGreedyStabilizationSweep(vi.history);
+
+    const status = document.getElementById('viStatusBadge');
+    if (vi.quizPending) {
+      status.innerHTML = `<span class="pill pill-pol">Quiz Mode: Predict max_a for ${escHtml(app.mdp.states[vi.quizPending.stateIdx])}</span>`;
+    } else if (vi.converged) {
+      status.innerHTML = `<span class="pill pill-val">Converged in ${vi.k} sweeps (Policy locked at Sweep ${stabK})</span>`;
+    } else {
+      status.innerHTML = `<span class="pill pill-muted">Ready for Sweep ${vi.k + 1}</span>`;
+    }
+
+    document.getElementById('viKpis').innerHTML = `
+      <div class="kpi-box"><div class="kpi-label">Sweeps (k)</div><div class="kpi-val">${vi.k}</div></div>
+      <div class="kpi-box"><div class="kpi-label">Latest Δ<sub>k</sub></div><div class="kpi-val">${fmtDelta(lastDelta)}</div></div>
+      <div class="kpi-box"><div class="kpi-label">Policy Locked Since</div><div class="kpi-val">${stabK ? `Sweep ${stabK}` : '—'}</div></div>
+    `;
+
+    // VI State/Action table
+    let html = `<table><thead><tr><th>State s</th><th style="text-align:right;">V<sub>old</sub>(s)</th>`;
+    for (let a = 0; a < A; a++) {
+      html += `<th style="text-align:right;">Q<sub>k</sub>(s, ${escHtml(app.mdp.actions[a])})</th>`;
+    }
+    html += `<th style="text-align:right;">V<sub>new</sub> = max</th><th>Implicit π<sub>greedy</sub></th></tr></thead><tbody>`;
+
+    for (let s = 0; s < N; s++) {
+      const hasNew = vi.subState === 0 ? vi.k > 0 : vi.updatedInSweep[s];
+      html += `<tr class="clickable-row ${vi.selectedState === s ? 'row-selected' : ''}" data-vi-row="${s}">
+        <td><strong>${escHtml(app.mdp.states[s])}</strong></td>
+        <td class="num-cell">${fmt(vi.V_old[s])}</td>`;
+      for (let a = 0; a < A; a++) {
+        const isWin = hasNew && vi.greedyPolicy[s] === a;
+        html += `<td class="num-cell ${isWin ? 'cell-pol' : ''}">${hasNew ? fmt(vi.Q_curr[s][a]) : '—'}</td>`;
+      }
+      html += `<td class="num-cell ${hasNew ? 'cell-val' : ''}">${hasNew ? fmt(vi.V_next[s]) : '—'}</td>
+        <td>${hasNew ? `<span class="pill pill-pol">${escHtml(app.mdp.actions[vi.greedyPolicy[s]])}</span>` : '—'}</td></tr>`;
+    }
+    html += `</tbody></table>`;
+    const vt = document.getElementById('viTable');
+    vt.innerHTML = html;
+    vt.querySelectorAll('tr[data-vi-row]').forEach(tr => {
+      tr.addEventListener('click', () => {
+        vi.selectedState = Number(tr.dataset.viRow);
+        renderTab5();
+      });
+    });
+
+    // Inspector pills
+    const pills = document.getElementById('viInspectStatePills');
+    pills.innerHTML = app.mdp.states.map((_, s) => `
+      <button class="btn btn-sm ${vi.selectedState === s ? 'btn-primary' : ''}" data-vi-insp="${s}">s<sub>${s}</sub></button>
+    `).join('');
+    pills.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        vi.selectedState = Number(btn.dataset.viInsp);
+        renderTab5();
+      });
+    });
+
+    renderViGlassBox();
+    renderRaceSection();
+  }
+
+  function renderViGlassBox() {
+    const vi = app.viState;
+    const box = document.getElementById('viGlassBox');
+    const s = vi.selectedState;
+
+    let html = `
+      <div class="eq-banner">
+        <span class="tok tok-v">V<sub>k+1</sub>(s)</span> =
+        <span class="tok tok-pol">max<sub>a</sub></span>
+        [ <span class="tok tok-r">R(s, a)</span> + γ ∑<sub>s′</sub>
+        <span class="tok tok-p">P(s′ | s, a)</span> · <span class="tok tok-v">V<sub>k</sub>(s′)</span> ]
+      </div>`;
+
+    let branches, bestA, bestVal, isQuiz = false;
+    if (vi.quizPending && vi.quizPending.stateIdx === s) {
+      isQuiz = true;
+      branches = vi.quizPending.branches;
+      bestA = vi.quizPending.bestA;
+      bestVal = vi.quizPending.expectedVal;
+    } else if (vi.lastStepInfo && vi.lastStepInfo.s === s) {
+      branches = vi.lastStepInfo.branches;
+      bestA = vi.lastStepInfo.bestA;
+      bestVal = vi.lastStepInfo.bestVal;
+    } else {
+      const source = vi.subState > 0 ? vi.V_old : vi.V_next;
+      branches = app.mdp.actions.map((_, a) => computeActionBranch(s, a, source));
+      bestA = 0; bestVal = -Infinity;
+      branches.forEach((d, a) => { if (d.total > bestVal + TIE_EPS) { bestVal = d.total; bestA = a; } });
+    }
+
+    branches.forEach((d, a) => {
+      const isWin = !isQuiz && a === bestA;
+      const termHtml = d.terms.map(t => `<span class="tok tok-p">${fmtShort(t.p)}</span>·<span class="tok tok-v">${fmt(t.v, 2)}</span>`).join(' + ');
+      html += `
+        <div class="branch-box ${isWin ? 'branch-active' : ''}">
+          <div class="branch-head">
+            <span>Branch a = ${escHtml(app.mdp.actions[a])}</span>
+            ${isWin ? '<span class="pill pill-pol">★ Winning max</span>' : (!isQuiz ? `<span class="pill pill-muted">${fmt(d.total)}</span>` : '')}
+          </div>
+          <div class="formula-line">
+            <span class="tok tok-r">${fmtShort(d.r)}</span> + ${app.gamma.toFixed(2)} × ( ${termHtml} )
+            ${!isQuiz ? ` = <strong>${fmt(d.total)}</strong>` : ''}
+          </div>
+        </div>`;
+    });
+
+    if (isQuiz) {
+      const q = vi.quizPending;
+      html += `
+        <div class="quiz-box">
+          <div style="font-weight:700;color:var(--c-pol);">Predict-It Challenge: Compute max<sub>a</sub> for ${escHtml(app.mdp.states[s])}!</div>
+          <div class="quiz-row">
+            <input type="number" step="0.01" id="viQuizInput" placeholder="Winning max value" style="width:170px;">
+            <button class="btn btn-purple btn-sm" id="btnViQuizCheck">Check Answer</button>
+            <button class="btn btn-sm" id="btnViQuizReveal">Reveal &amp; Continue</button>
+          </div>
+          ${q.feedback ? `<div style="margin-top:8px;font-size:12.5px;">${q.feedback}</div>` : ''}
+        </div>`;
+    } else {
+      html += `
+        <div class="callout callout-green" style="display:flex;justify-content:space-between;align-items:center;">
+          <span><strong>Max Result for ${escHtml(app.mdp.states[s])}:</strong> (Action: ${escHtml(app.mdp.actions[bestA])})</span>
+          <span class="tok tok-v" style="font-size:14px;">V = ${fmt(bestVal)}</span>
+        </div>`;
+    }
+
+    box.innerHTML = html;
+
+    if (isQuiz) {
+      document.getElementById('btnViQuizCheck').addEventListener('click', () => {
+        const val = parseFloat(document.getElementById('viQuizInput').value);
+        if (Number.isNaN(val)) {
+          vi.quizPending.feedback = `<span style="color:var(--c-danger);font-weight:600;">Please enter a number first.</span>`;
+        } else if (Math.abs(val - bestVal) <= 0.02) {
+          vi.quizPending.feedback = `<span style="color:var(--c-val);font-weight:700;">Spot on! Winning branch is ${escHtml(app.mdp.actions[bestA])} with value ${fmt(bestVal)}.</span>`;
+        } else {
+          const hintList = branches.map(b => `${escHtml(app.mdp.actions[b.a])}: ${fmt(b.total, 2)}`).join(' vs. ');
+          vi.quizPending.feedback = `<span style="color:var(--c-danger);font-weight:600;">Not quite (off by ${fmt(Math.abs(val - bestVal), 2)}).</span>
+            <div style="margin-top:4px;color:var(--ink);">Hint: Competing branches are ${hintList}. Take the larger one!</div>`;
+        }
+        renderViGlassBox();
+      });
+      document.getElementById('btnViQuizReveal').addEventListener('click', () => {
+        viStepSingleState(true);
+      });
+    }
+  }
+
+  function runFourWayRace() {
+    if (!validateMDP().valid) return;
+    const N = app.mdp.states.length;
+    const A = app.mdp.actions.length;
+    const evalPol = [...app.evalState.policy];
+    const piInit = clampPolicyArray(app.mdp.defaultPiInit, N, A, A - 1);
+
+    // 1. Sync Policy Evaluation on evalPol
+    const syncEval = runSyncPolicyEvalFast(evalPol);
+    const exactEvalV = solveExactPolicyValue(evalPol);
+
+    // 2. In-Place Policy Evaluation on evalPol
+    const ipEval = runInPlacePolicyEvalFast(evalPol);
+
+    // 3. Policy Iteration from piInit
+    let pol = [...piInit];
+    let outerIters = 0;
+    let totalPiSweeps = 0;
+    let piV = zeros(N);
+    const piDeltas = [];
+    while (outerIters < 30) {
+      const ev = runSyncPolicyEvalFast(pol);
+      piV = ev.V;
+      ev.deltas.forEach(pt => {
+        totalPiSweeps++;
+        piDeltas.push({ k: totalPiSweeps, y: pt.y });
+      });
+      const nextPol = zeros(N);
+      for (let s = 0; s < N; s++) {
+        let bestA = pol[s];
+        let bestVal = computeActionBranch(s, bestA, piV).total;
+        for (let a = 0; a < A; a++) {
+          const q = computeActionBranch(s, a, piV).total;
+          if (q > bestVal + TIE_EPS) { bestVal = q; bestA = a; }
+        }
+        nextPol[s] = bestA;
+      }
+      outerIters++;
+      if (nextPol.every((a, s) => a === pol[s])) break;
+      pol = nextPol;
+    }
+
+    // 4. Value Iteration from V0 = 0
+    let viV = zeros(N);
+    let viSweeps = 0;
+    const viDeltas = [];
+    let viPol = zeros(N);
+    while (viSweeps < MAX_SWEEPS) {
+      const Vnext = zeros(N);
+      for (let s = 0; s < N; s++) {
+        let bestA = 0, bestVal = -Infinity;
+        for (let a = 0; a < A; a++) {
+          const q = computeActionBranch(s, a, viV).total;
+          if (q > bestVal + TIE_EPS) { bestVal = q; bestA = a; }
+        }
+        Vnext[s] = bestVal;
+        viPol[s] = bestA;
+      }
+      const delta = maxNormDiff(Vnext, viV);
+      viV = Vnext;
+      viSweeps++;
+      viDeltas.push({ k: viSweeps, y: delta });
+      if (delta < app.theta) break;
+    }
+
+    const exactStarV = solveExactPolicyValue(pol);
+
+    app.raceState = {
+      evalPol,
+      syncEval: { ...syncEval, err: exactEvalV ? maxNormDiff(syncEval.V, exactEvalV) : null },
+      ipEval: { ...ipEval, err: exactEvalV ? maxNormDiff(ipEval.V, exactEvalV) : null },
+      pi: { V: piV, policy: pol, outerIters, totalSweeps: totalPiSweeps, deltas: piDeltas, err: exactStarV ? maxNormDiff(piV, exactStarV) : null },
+      vi: { V: viV, policy: viPol, sweeps: viSweeps, deltas: viDeltas, err: exactStarV ? maxNormDiff(viV, exactStarV) : null },
+      exactStarV
+    };
+    renderRaceSection();
+  }
+
+  function renderRaceSection() {
+    const out = document.getElementById('raceOutput');
+    if (!app.raceState) {
+      out.innerHTML = `<div class="callout">Click <strong>"Run 4-Way Race"</strong> to execute all four DP algorithms on the current MDP (<span class="math">γ = ${app.gamma.toFixed(2)}, θ = ${app.theta}</span>) and compare their sweep counts, final values, and contraction curves side by side.</div>`;
+      return;
+    }
+
+    const r = app.raceState;
+    const polStr = (p) => `(${p.map(a => escHtml(app.mdp.actions[a])).join(', ')})`;
+    const vecStr = (v) => `[${v.map(x => fmt(x, 4)).join(', ')}]`;
+
+    out.innerHTML = `
+      <div class="tbl-wrap" style="margin-bottom:14px;">
+        <table>
+          <thead>
+            <tr>
+              <th>Algorithm</th>
+              <th>Task</th>
+              <th style="text-align:right;">Total Sweeps</th>
+              <th style="text-align:right;">Outer Iters</th>
+              <th>Final Value Vector</th>
+              <th>Final Policy</th>
+              <th style="text-align:right;">Max Error vs. Exact</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong style="color:#0969DA;">1. Policy Eval (Sync)</strong></td>
+              <td>Prediction (current π)</td>
+              <td class="num-cell">${r.syncEval.sweeps}</td>
+              <td class="num-cell">—</td>
+              <td class="mono" style="font-size:11.5px;">${vecStr(r.syncEval.V)}</td>
+              <td>${polStr(r.evalPol)}</td>
+              <td class="num-cell">${fmtDelta(r.syncEval.err)}</td>
+            </tr>
+            <tr>
+              <td><strong style="color:#0F766E;">2. Policy Eval (In-Place)</strong></td>
+              <td>Prediction (current π)</td>
+              <td class="num-cell cell-fresh">${r.ipEval.sweeps}</td>
+              <td class="num-cell">—</td>
+              <td class="mono" style="font-size:11.5px;">${vecStr(r.ipEval.V)}</td>
+              <td>${polStr(r.evalPol)}</td>
+              <td class="num-cell">${fmtDelta(r.ipEval.err)}</td>
+            </tr>
+            <tr>
+              <td><strong style="color:#7C3AED;">3. Policy Iteration</strong></td>
+              <td>Control (find π*)</td>
+              <td class="num-cell">${r.pi.totalSweeps}</td>
+              <td class="num-cell">${r.pi.outerIters}</td>
+              <td class="mono cell-val" style="font-size:11.5px;">${vecStr(r.pi.V)}</td>
+              <td><span class="pill pill-pol">${polStr(r.pi.policy)}</span></td>
+              <td class="num-cell">${fmtDelta(r.pi.err)}</td>
+            </tr>
+            <tr>
+              <td><strong style="color:#B45309;">4. Value Iteration</strong></td>
+              <td>Control (find π*)</td>
+              <td class="num-cell cell-prob">${r.vi.sweeps}</td>
+              <td class="num-cell">—</td>
+              <td class="mono cell-val" style="font-size:11.5px;">${vecStr(r.vi.V)}</td>
+              <td><span class="pill pill-pol">${polStr(r.vi.policy)}</span></td>
+              <td class="num-cell">${fmtDelta(r.vi.err)}</td>
+            </tr>
+            ${r.exactStarV ? `<tr style="background:#F8FAFC;">
+              <td><strong>Exact Matrix Inverse (π*)</strong></td>
+              <td>Ground Truth</td>
+              <td class="num-cell">Direct</td>
+              <td class="num-cell">—</td>
+              <td class="mono" style="font-size:11.5px;font-weight:700;">${vecStr(r.exactStarV)}</td>
+              <td>${polStr(r.pi.policy)}</td>
+              <td class="num-cell">0.0000</td>
+            </tr>` : ''}
+          </tbody>
+        </table>
+      </div>
+      <div class="svg-stage" id="raceChartStage"></div>`;
+
+    renderContractionChartSVG(document.getElementById('raceChartStage'), {
+      series: [
+        { label: 'Sync Eval', color: '#0969DA', points: r.syncEval.deltas },
+        { label: 'In-Place Eval', color: '#0F766E', points: r.ipEval.deltas },
+        { label: 'Policy Iter (Cumulative)', color: '#7C3AED', points: r.pi.deltas },
+        { label: 'Value Iter', color: '#B45309', points: r.vi.deltas }
+      ],
+      theta: app.theta,
+      logScale: app.raceChartScale === 'log'
+    });
+  }
+
+  /* ========================================================================
+     12. GLOBAL RENDERING, VALIDATION & EVENT WIRING
+     ======================================================================== */
+  function renderValidationBanner() {
+    const val = validateMDP();
+    const banner = document.getElementById('validationBanner');
+    if (val.valid) {
+      banner.classList.add('hidden');
+    } else {
+      banner.classList.remove('hidden');
+      const first = val.invalidRows[0];
+      document.getElementById('validationText').textContent =
+        `Invalid MDP: ${val.invalidRows.length} transition row(s) violate the probability axiom (e.g., Action "${app.mdp.actions[first.a]}", State "${app.mdp.states[first.s]}" sums to ${first.sum.toFixed(2)}). Algorithms are paused until fixed.`;
+    }
+  }
+
+  function renderAll() {
+    renderValidationBanner();
+    renderTab1();
+    renderTab2();
+    renderTab3();
+    renderTab4();
+    renderTab5();
+  }
+
+  function wireEvents() {
+    // Preset Selector
+    document.getElementById('presetSelect').addEventListener('change', e => {
+      loadPreset(e.target.value);
+    });
+
+    // Gamma Slider
+    document.getElementById('gammaSlider').addEventListener('input', e => {
+      app.gamma = parseFloat(e.target.value);
+      document.getElementById('gammaDisplay').textContent = app.gamma.toFixed(2);
+      resetAllSimulations(false);
+      renderAll();
+    });
+
+    // Theta Selector
+    document.getElementById('thetaSelect').addEventListener('change', e => {
+      app.theta = parseFloat(e.target.value);
+      resetAllSimulations(false);
+      renderAll();
+    });
+
+    // Predict-It Quiz Mode Toggle
+    document.getElementById('quizToggle').addEventListener('change', e => {
+      app.quizMode = e.target.checked;
+      if (!app.quizMode) {
+        if (app.evalState) app.evalState.quizPending = null;
+        if (app.viState) app.viState.quizPending = null;
+      }
+      renderTab2();
+      renderTab5();
+    });
+
+    // Tab Switching
+    document.querySelectorAll('#tabButtons .tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        app.activeTab = btn.dataset.tab;
+        document.querySelectorAll('#tabButtons .tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === app.activeTab));
+        renderAll();
+      });
+    });
+
+    // Validation Banner Actions
+    document.getElementById('btnFixNormalizeAll').addEventListener('click', () => {
+      const val = validateMDP();
+      val.invalidRows.forEach(r => normalizeProbRow(r.a, r.s));
+      resetAllSimulations(false);
+      renderAll();
+    });
+
+    document.getElementById('btnJumpDesigner').addEventListener('click', () => {
+      document.querySelector('[data-tab="tab1"]').click();
+    });
+
+    // Tab 1: Add/Remove States & Actions
+    document.getElementById('btnAddState').addEventListener('click', () => {
+      const N = app.mdp.states.length;
+      if (N >= 5) return;
+      app.mdp.states.push(`State ${N} (s${N})`);
+      for (let a = 0; a < app.mdp.actions.length; a++) {
+        app.mdp.R[a].push(0);
+        app.mdp.P[a].forEach(row => row.push(0));
+        const newRow = zeros(N + 1);
+        newRow[N] = 1.0;
+        app.mdp.P[a].push(newRow);
+      }
+      app.mdp.defaultEvalPolicy.push(0);
+      app.mdp.defaultPiInit.push(0);
+      resetAllSimulations(false);
+      renderAll();
+    });
+
+    document.getElementById('btnRemState').addEventListener('click', () => {
+      const N = app.mdp.states.length;
+      if (N <= 2) return;
+      app.mdp.states.pop();
+      for (let a = 0; a < app.mdp.actions.length; a++) {
+        app.mdp.R[a].pop();
+        app.mdp.P[a].pop();
+        app.mdp.P[a].forEach((row, s) => {
+          row.pop();
+          normalizeProbRow(a, s);
+        });
+      }
+      app.mdp.defaultEvalPolicy.pop();
+      app.mdp.defaultPiInit.pop();
+      resetAllSimulations(false);
+      renderAll();
+    });
+
+    document.getElementById('btnAddAction').addEventListener('click', () => {
+      const N = app.mdp.states.length;
+      const A = app.mdp.actions.length;
+      if (A >= 3) return;
+      app.mdp.actions.push(`Action ${A}`);
+      app.mdp.R.push(zeros(N));
+      // Identity transition matrix as clean valid default
+      const eye = Array.from({ length: N }, (_, i) => Array.from({ length: N }, (_, j) => (i === j ? 1.0 : 0.0)));
+      app.mdp.P.push(eye);
+      resetAllSimulations(false);
+      renderAll();
+    });
+
+    document.getElementById('btnRemAction').addEventListener('click', () => {
+      if (app.mdp.actions.length <= 2) return;
+      app.mdp.actions.pop();
+      app.mdp.R.pop();
+      app.mdp.P.pop();
+      resetAllSimulations(false);
+      renderAll();
+    });
+
+    document.getElementById('btnResetPreset').addEventListener('click', () => {
+      loadPreset(app.presetKey);
+    });
+
+    // Tab 2 Controls
+    document.querySelectorAll('#evalModeToggle .seg-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        app.evalState.mode = btn.dataset.mode;
+        resetEvalState(false);
+        renderTab2();
+      });
+    });
+
+    document.getElementById('btnEvalStepState').addEventListener('click', () => evalStepSingleState(false));
+    document.getElementById('btnEvalStepSweep').addEventListener('click', () => evalStepFullSweep());
+    document.getElementById('btnEvalRunAll').addEventListener('click', () => evalRunToConvergence());
+    document.getElementById('btnEvalReset').addEventListener('click', () => { resetEvalState(false); renderTab2(); });
+
+    document.querySelectorAll('#evalChartScale .seg-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        app.evalChartScale = btn.dataset.scale;
+        document.querySelectorAll('#evalChartScale .seg-btn').forEach(b => b.classList.toggle('active', b === btn));
+        renderEvalChart();
+      });
+    });
+
+    // Tab 3 Controls
+    document.getElementById('btnVecStep').addEventListener('click', () => vecStepSweep());
+    document.getElementById('btnVecRun').addEventListener('click', () => vecRunToConvergence());
+    document.getElementById('btnVecReset').addEventListener('click', () => { resetVecState(); renderTab3(); });
+    document.getElementById('btnToggleExact').addEventListener('click', () => {
+      app.vecState.showExact = !app.vecState.showExact;
+      renderTab3();
+    });
+
+    // Tab 4 Controls
+    document.getElementById('btnPiEval').addEventListener('click', () => piStepEvaluate());
+    document.getElementById('btnPiLookahead').addEventListener('click', () => piStepLookahead());
+    document.getElementById('btnPiImprove').addEventListener('click', () => piStepImprove());
+    document.getElementById('btnPiRunFull').addEventListener('click', () => piRunFull());
+    document.getElementById('btnPiReset').addEventListener('click', () => { resetPiState(true); renderTab4(); });
+
+    // Tab 5 Controls
+    document.getElementById('btnViStepState').addEventListener('click', () => viStepSingleState(false));
+    document.getElementById('btnViStepSweep').addEventListener('click', () => viStepSweep());
+    document.getElementById('btnViRunAll').addEventListener('click', () => viRunToConvergence());
+    document.getElementById('btnViReset').addEventListener('click', () => { resetViState(); renderTab5(); });
+    document.getElementById('btnRunRace').addEventListener('click', () => runFourWayRace());
+
+    document.querySelectorAll('#raceChartScale .seg-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        app.raceChartScale = btn.dataset.scale;
+        document.querySelectorAll('#raceChartScale .seg-btn').forEach(b => b.classList.toggle('active', b === btn));
+        renderRaceSection();
+      });
+    });
+  }
+
+  // Boot Application
+  wireEvents();
+  loadPreset('drone');
+  // deep links from the lecture notes: #tab1 ... #tab5
+  const openHash = () => { const b = document.querySelector('[data-tab="' + location.hash.slice(1) + '"]'); if (b) b.click(); };
+  openHash(); window.addEventListener('hashchange', openHash);
+  document.querySelectorAll('#tabButtons .tab-btn').forEach(b => b.addEventListener('click', () => history.replaceState(null, '', '#' + b.dataset.tab)));
+})();
+</script>
+</body>
+</html>

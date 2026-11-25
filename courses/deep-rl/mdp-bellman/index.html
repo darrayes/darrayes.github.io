@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Markov Decision Processes and Bellman Equations — Lecture Notes</title>
+<meta name="description" content="Byte-by-byte lecture notes on Markov Decision Processes: the agent-environment loop, the Markov property, dynamics, policies, returns, value functions, Bellman expectation and optimality equations, with a worked delivery-drone example.">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<style>
+:root{
+  color-scheme: light;
+  --bg:#fcfcfb; --paper:#ffffff; --ink:#1b1b1a; --ink2:#52514e; --muted:#85837d;
+  --line:#e4e2dc; --soft:#f4f3ef; --accent:#2a78d6;
+  /* semantic roles used in every figure */
+  --q:#2a78d6; --q-soft:#e3eefb;      /* Query  = blue   */
+  --k:#eb6834; --k-soft:#fde9e0;      /* Key    = orange */
+  --v:#1baf7a; --v-soft:#ddf4ea;      /* Value  = aqua   */
+  --enc:#3d6fb6; --enc-soft:#e8eef8;  /* encoder blocks */
+  --dec:#6250d6; --dec-soft:#ecE9fb;  /* decoder blocks */
+  --ffn:#b77d00; --ffn-soft:#fbf1da;  /* feed-forward   */
+  --norm:#7a7870; --norm-soft:#efeeea;/* add & norm     */
+  --mask:#c9c7c0;
+  --sidebar:300px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:16px}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.65 "Charter","Iowan Old Style","Georgia",serif;}
+h1,h2,h3,h4,.ui,nav,.ctrl,.mats .op,.builds,figcaption,.call b,table,.chip,button,label{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif}
+a{color:var(--accent)}
+code,.mono{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:.88em}
+
+/* ---------- layout ---------- */
+#toc{position:fixed;top:0;left:0;bottom:0;width:var(--sidebar);overflow-y:auto;background:var(--paper);border-right:1px solid var(--line);padding:22px 14px 40px;font-size:13.5px;line-height:1.35}
+#toc .brand{font-weight:700;font-size:15px;margin:0 6px 4px}
+#toc .sub{color:var(--muted);margin:0 6px 14px;font-size:12.5px}
+#toc input{width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:12px;font-size:13px;background:var(--bg)}
+#toc .ptitle{display:flex;align-items:center;gap:6px;width:100%;margin:12px 0 4px;padding:5px 6px;border:0;border-radius:6px;background:none;cursor:pointer;text-align:left;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+#toc .ptitle:hover{background:var(--soft);color:var(--ink)}
+#toc .ptitle:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+#toc .ptitle .chev{display:inline-block;width:10px;font-size:10px;transition:transform .15s}
+#toc .pgroup.closed .chev{transform:rotate(-90deg)}
+#toc .pgroup.closed .pitems{display:none}
+#toc .filtering .pgroup.closed .pitems{display:block}
+#toc .pgroup.closed.has-on .ptitle{color:var(--accent)}
+#toc a{display:flex;gap:8px;padding:4px 6px;border-radius:6px;color:var(--ink2);text-decoration:none}
+#toc a:hover{background:var(--soft);color:var(--ink)}
+#toc a.on{background:var(--q-soft);color:var(--ink);font-weight:600}
+#toc a .n{min-width:22px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+#toc a.extra .n{visibility:hidden}
+#progress{position:fixed;top:0;left:var(--sidebar);right:0;height:3px;background:transparent;z-index:20}
+#progress div{height:100%;width:0;background:var(--accent)}
+main{margin-left:var(--sidebar);padding:40px 40px 120px}
+.wrap{max-width:820px;margin:0 auto}
+#menu{display:none}
+@media (max-width:980px){
+  html,body{overflow-x:hidden}
+  .mat td{min-width:44px;padding:0 3px}
+  #toc{transform:translateX(-100%);transition:transform .2s;z-index:30;box-shadow:0 0 30px rgba(0,0,0,.15)}
+  body.menu-open #toc{transform:none}
+  main{margin-left:0;padding:56px 18px 100px}
+  #progress{left:0}
+  #menu{display:block;position:fixed;top:10px;left:10px;z-index:40;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:6px 11px;font-size:14px}
+}
+
+/* ---------- title ---------- */
+.hero{padding:28px 0 18px;border-bottom:1px solid var(--line);margin-bottom:28px}
+.hero .kicker{font:700 12px/1 sans-serif;letter-spacing:.14em;color:var(--accent);text-transform:uppercase}
+.hero h1{font-size:44px;line-height:1.1;margin:10px 0 8px;letter-spacing:-.01em}
+.hero p.lede{font-size:19px;color:var(--ink2);margin:0}
+
+/* ---------- parts and bytes ---------- */
+.part{margin:70px 0 10px;padding:26px 28px;border-radius:14px;background:linear-gradient(135deg,#eef3fb,#f3f0fb)}
+.part .pn{font:700 12px/1 sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--dec)}
+.part h1{margin:8px 0 6px;font-size:30px;line-height:1.2}
+.part p{margin:6px 0 0;color:var(--ink2)}
+section.byte{margin:46px 0 0;padding-top:6px}
+section.byte>h2{font-size:25px;line-height:1.25;margin:0 0 12px;display:flex;gap:12px;align-items:baseline}
+section.byte>h2 .num{flex:none;display:inline-grid;place-items:center;min-width:36px;height:36px;padding:0 6px;border-radius:10px;background:var(--ink);color:#fff;font-size:15px;transform:translateY(-3px)}
+section.extra>h2 .num{background:var(--muted)}
+h3{font-size:19px;margin:28px 0 8px}
+.builds{font:13px/1.4 sans-serif;color:var(--muted);margin:-4px 0 14px}
+.builds a{color:var(--ink2)}
+p{margin:12px 0}
+ul,ol{padding-left:24px}
+li{margin:5px 0}
+
+/* ---------- equations ---------- */
+.eq{background:var(--paper);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;padding:10px 16px;margin:16px 0;overflow-x:auto}
+.eq .katex-display{margin:.4em 0}
+.eq .where{font:14px/1.5 sans-serif;color:var(--ink2);margin-top:4px}
+
+/* ---------- callouts ---------- */
+.call{border-radius:10px;padding:12px 16px;margin:18px 0;background:var(--soft);border:1px solid var(--line)}
+.call>b:first-child{display:block;font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.call.key{background:#eef4fc;border-color:#cfe0f6}.call.key>b:first-child{color:var(--q)}
+.call.shape{background:#eef8f3;border-color:#cbeadb}.call.shape>b:first-child{color:#12805a}
+.call.bg{background:#fbf6e9;border-color:#efe1b8}.call.bg>b:first-child{color:#946500}
+.call.warn{background:#fdf0ea;border-color:#f6d3c2}.call.warn>b:first-child{color:#c24b1a}
+.call.note>b:first-child{color:var(--ink2)}
+.call.ex{background:var(--paper)}.call.ex>b:first-child{color:var(--ink2)}
+
+/* ---------- tables ---------- */
+table.t{border-collapse:collapse;margin:16px 0;font-size:14.5px;width:100%;background:var(--paper)}
+table.t th,table.t td{border-bottom:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+table.t th{background:var(--soft);font-weight:600}
+table.t td.c,table.t th.c{text-align:center}
+.tw{overflow-x:auto}
+
+/* ---------- figures ---------- */
+figure.fig{margin:22px 0 26px;padding:16px 16px 12px;background:var(--paper);border:1px solid var(--line);border-radius:12px}
+figure.fig svg{display:block;max-width:100%;height:auto;margin:0 auto;}
+figure.fig > svg{width:100%;max-width:760px}
+figure.fig svg{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif}
+figcaption{font-size:13.5px;line-height:1.5;color:var(--ink2);margin-top:10px;border-top:1px dashed var(--line);padding-top:9px}
+figcaption b{color:var(--ink)}
+.fig .row{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;align-items:flex-start}
+.ctrl{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:center;font-size:13.5px;margin:6px 0 10px;color:var(--ink2)}
+.ctrl input[type=range]{width:200px;accent-color:var(--accent)}
+.ctrl output{font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink);min-width:3.5em;display:inline-block}
+button{border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;color:var(--ink)}
+button:hover{background:var(--soft)}
+button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.chip{display:inline-block;font-size:12px;padding:1px 8px;border-radius:99px;font-weight:600}
+.chip.q{background:var(--q-soft);color:#1b5aa6}.chip.k{background:var(--k-soft);color:#b5461a}.chip.v{background:var(--v-soft);color:#0f7a54}
+.legend{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;font:12.5px sans-serif;color:var(--ink2);margin-top:6px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+
+/* SVG roles */
+svg text{fill:var(--ink);font-size:13px}
+svg .sm{font-size:11px;fill:var(--ink2)}
+svg .xs{font-size:10px;fill:var(--muted)}
+svg .b{font-weight:700}
+svg .mut{fill:var(--muted)}
+svg .ln{stroke:var(--ink2);stroke-width:1.5;fill:none}
+svg .arr{stroke:var(--ink2);stroke-width:1.6;fill:none;marker-end:url(#ah)}
+svg .arrq{stroke:var(--q);stroke-width:1.8;fill:none;marker-end:url(#ahq)}
+svg .arrk{stroke:var(--k);stroke-width:1.8;fill:none;marker-end:url(#ahk)}
+svg .arrv{stroke:var(--v);stroke-width:1.8;fill:none;marker-end:url(#ahv)}
+svg .dash{stroke-dasharray:4 4}
+svg .box{fill:var(--paper);stroke:var(--ink2);stroke-width:1.3}
+svg .grid{stroke:var(--line);stroke-width:1}
+svg .axis{stroke:var(--muted);stroke-width:1}
+svg .fq{fill:var(--q-soft);stroke:var(--q);stroke-width:1.4}
+svg .fk{fill:var(--k-soft);stroke:var(--k);stroke-width:1.4}
+svg .fv{fill:var(--v-soft);stroke:var(--v);stroke-width:1.4}
+svg .fenc{fill:var(--enc-soft);stroke:var(--enc);stroke-width:1.4}
+svg .fdec{fill:var(--dec-soft);stroke:var(--dec);stroke-width:1.4}
+svg .fffn{fill:var(--ffn-soft);stroke:var(--ffn);stroke-width:1.4}
+svg .fnorm{fill:var(--norm-soft);stroke:var(--norm);stroke-width:1.2}
+svg .fx{fill:#f1f0ec;stroke:var(--ink2);stroke-width:1.3}
+svg .fmask{fill:url(#hatch);stroke:var(--mask)}
+
+/* ---------- matrices (rendered by JS) ---------- */
+.mat{max-width:100%;overflow-x:auto;display:inline-block;margin:6px 4px;vertical-align:top;text-align:center}
+.mat .mt{font:600 12.5px/1.3 sans-serif;color:var(--ink2);margin-bottom:5px}
+.mat .mt .katex{font-size:1.05em}
+.mat table{border-collapse:separate;border-spacing:2px;font:12.5px/1 "SF Mono",Menlo,Consolas,monospace;margin:0 auto}
+.mat td{min-width:54px;height:28px;padding:0 6px;text-align:center;border-radius:4px;font-variant-numeric:tabular-nums}
+.mat th{font:600 11.5px/1.2 sans-serif;color:var(--ink2);padding:2px 6px;white-space:nowrap}
+.mat th.r{text-align:right}
+.mat td.inf{background:repeating-linear-gradient(45deg,#ecebe6 0 4px,#f8f7f4 4px 8px);color:var(--muted)}
+.mat td.hl{outline:2px solid var(--ink);outline-offset:-1px}
+.mat .shp{font:11px sans-serif;color:var(--muted);margin-top:4px}
+.mats{max-width:100%;overflow-x:auto;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px 10px;margin:14px 0}
+.mats .op{font:22px/1 sans-serif;color:var(--muted);padding:0 2px}
+.scale{display:flex;justify-content:center;align-items:center;gap:6px;font:11px sans-serif;color:var(--muted);margin-top:6px}
+.scale span.bar{display:inline-block;width:120px;height:9px;border-radius:3px}
+
+/* Part III stage map */
+.stagemap{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 16px}
+.stagemap span{font:11.5px/1 sans-serif;padding:5px 7px;border-radius:6px;background:var(--soft);color:var(--muted);border:1px solid var(--line)}
+.stagemap span.done{color:var(--ink2)}
+.stagemap span.now{background:var(--ink);color:#fff;border-color:var(--ink);font-weight:600}
+.stagemap span.e{border-left:3px solid var(--enc)}.stagemap span.d{border-left:3px solid var(--dec)}
+
+.tip{position:fixed;pointer-events:none;background:#1b1b1a;color:#fff;font:12px/1.4 sans-serif;padding:6px 9px;border-radius:6px;z-index:50;opacity:0;transition:opacity .08s;max-width:260px}
+.qa ol li{margin:8px 0}
+details{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px 14px;margin:12px 0}
+details summary{cursor:pointer;font:600 14px sans-serif}
+footer{margin-top:80px;border-top:1px solid var(--line);padding-top:18px;font:13px sans-serif;color:var(--muted)}
+@media print{#toc,#menu,#progress,.ctrl{display:none}main{margin:0;padding:0}figure.fig,section.byte{break-inside:avoid}}
+
+.call.wb{background:#f3f0fb;border-color:#ddd6fe}.call.wb>b:first-child{color:var(--dec)}
+.call.sup{border-left:4px solid var(--dec)}
+.badge-sup{display:inline-block;font:600 11px/1.6 sans-serif;color:var(--dec);background:#ece9fb;border-radius:99px;padding:0 8px;margin-left:8px;vertical-align:middle;letter-spacing:.02em}
+table.t td .katex{font-size:1em}
+</style>
+</head>
+<body>
+<button id="menu" onclick="document.body.classList.toggle('menu-open')">☰ Contents</button>
+<div id="progress"><div></div></div>
+<nav id="toc"><a class="crumb" href="../" style="font-size:12px;margin:0 0 10px;color:var(--muted)">← Deep Reinforcement Learning</a><a class="crumb" href="../dynamic-programming/" style="font-size:12.5px;margin:0 0 12px;background:var(--q-soft);color:var(--ink);font-weight:600">Next: Dynamic Programming →</a><div class="brand">MDPs &amp; Bellman Equations</div><div class="sub">Lecture 1 · Part 1 (Bytes 1–9)</div><input id="tocq" type="search" placeholder="Filter topics…"><div id="toclist"></div></nav>
+<div class="tip" id="tip"></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#52514e"/></marker>
+<marker id="ahq" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2a78d6"/></marker>
+<marker id="ahk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#eb6834"/></marker>
+<marker id="ahv" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1baf7a"/></marker>
+</defs></svg>
+<main><div class="wrap">
+<header class="hero">
+  <div class="kicker">Deep Reinforcement Learning · Lecture 1</div>
+  <h1>Markov Decision Processes &amp; Bellman Equations</h1>
+  <p class="lede">First-principles lecture notes: from the agent–environment loop to the Bellman expectation and optimality equations, one byte at a time, with every equation checked on a small delivery-drone example.</p>
+</header>
+
+<section class="byte extra" id="how">
+<h2><span class="num">·</span><span class="tt">How to use these notes</span></h2>
+<p>The notes are in strict dependency order. Each section is a <b>byte</b>: one idea, readable in a few minutes, using only ideas from earlier bytes. Background mathematics (expectation, marginal probabilities, linear systems) is taught in its own short byte, marked <b>B</b>, right before it is first needed.</p>
+<p>Each byte gives the motivation, the equation with every symbol explained, the intuition, and a worked example with small numbers you can check by hand. Work each example yourself before reading on.</p>
+<div class="call key"><b>Learning path</b>
+<b style="display:inline;text-transform:none;letter-spacing:0;font-size:inherit;color:inherit">Part 1 (this lecture, Bytes 1–9)</b>: the agent–environment interface, the Markov property, dynamics, policies, returns, value functions, the Bellman expectation equations (scalar and matrix form) and the Bellman optimality equations.<br>
+<b style="display:inline;text-transform:none;letter-spacing:0;font-size:inherit;color:inherit">Part 2 (<a href="../dynamic-programming/">Lecture 2</a>, Bytes 10–18)</b>: dynamic programming — turning these equations into algorithms (policy evaluation, policy iteration, value iteration).</div>
+<div class="call sup"><b>About the marked additions</b>Sections and boxes tagged <span class="badge-sup">supplement</span> were added to the original notes: background bytes, worked numbers on the running example, review questions and the consolidated mental model. Every number in them is computed by code from the stated equations.</div>
+</section>
+
+<section class="byte extra" id="notation">
+<h2><span class="num">·</span><span class="tt">Notation</span></h2>
+<p>One symbol means one thing throughout this lecture and the next.</p>
+<div class="tw"><table class="t">
+<tr><th>Symbol</th><th>Meaning</th></tr>
+<tr><td>\(t\)</td><td>discrete time step, \(t = 0, 1, 2, \ldots\)</td></tr>
+<tr><td>\(\mathcal{S},\ \mathcal{A}(s),\ \mathcal{R}\)</td><td>finite set of states (size \(N = |\mathcal{S}|\)), actions available in state \(s\), and possible rewards (\(\mathcal{R} \subset \mathbb{R}\))</td></tr>
+<tr><td>\(S_t,\ A_t,\ R_{t+1}\)</td><td>random state, action and reward at time \(t\) (capital letters = random variables)</td></tr>
+<tr><td>\(s,\ a,\ r,\ s'\)</td><td>particular values: a state, an action, a reward, a next state</td></tr>
+<tr><td>\(p(s', r \mid s, a)\)</td><td>four-argument dynamics: probability of next state \(s'\) and reward \(r\) after action \(a\) in state \(s\)</td></tr>
+<tr><td>\(P(s' \mid s, a),\ R(s,a)\)</td><td>state-transition probability and expected immediate reward (both derived from \(p\))</td></tr>
+<tr><td>\(\pi(a \mid s)\), \(\pi(s)\)</td><td>stochastic policy (probability of action \(a\) in state \(s\)); deterministic policy (the chosen action)</td></tr>
+<tr><td>\(\gamma\)</td><td>discount factor</td></tr>
+<tr><td>\(G_t\)</td><td>discounted return from time \(t\)</td></tr>
+<tr><td>\(V^{\pi}(s),\ Q^{\pi}(s,a)\)</td><td>state-value and action-value functions of policy \(\pi\)</td></tr>
+<tr><td>\(v^{\pi},\ r^{\pi},\ P^{\pi}\)</td><td>vector / matrix forms: \(v^{\pi}, r^{\pi} \in \mathbb{R}^{N}\), \(P^{\pi} \in \mathbb{R}^{N\times N}\)</td></tr>
+<tr><td>\(V^{*},\ Q^{*},\ \pi^{*}\)</td><td>optimal state-value, optimal action-value, optimal policy</td></tr>
+<tr><td>\(\mathbb{E}[\,\cdot\,]\), \(\mathbb{E}_{\pi}[\,\cdot\,]\)</td><td>expectation; expectation when actions are chosen by \(\pi\) (<a href="#bg-exp">Byte B2</a>)</td></tr>
+</table></div>
+<p>Reserved letters: \(R(s,a)\) (a function) is never the random reward \(R_{t+1}\); \(P(s'\mid s,a)\) is the environment's fixed physics, \(P^{\pi}\) is the matrix a policy picks out of it.</p>
+</section>
+
+<!-- ============================================================ -->
+<div class="part" id="part-intro" data-short="Setting the stage">
+<div class="pn">Bytes 0–2</div><h1>The interface, the Markov property and dynamics</h1>
+<p>What an agent sees, what the environment does, and how one function describes the whole environment.</p>
+</div>
+
+<section class="byte" id="b0">
+<h2><span class="num">0</span><span class="tt">Introduction: the agent–environment interface</span></h2>
+<p>Reinforcement Learning (RL) formalizes the problem of learning from interaction to achieve a goal. The decision-maker is called the <b>agent</b>, and everything outside the agent is the <b>environment</b>.</p>
+<p>The interaction unfolds continuously across discrete time steps \(t \in \{0, 1, 2, 3, \ldots\}\):</p>
+<ul>
+<li>At time step \(t\), the agent receives a representation of the environment's state: \(S_t \in \mathcal{S}\).</li>
+<li>Based on this state, the agent selects an action: \(A_t \in \mathcal{A}(s)\).</li>
+<li>One time step later, as a consequence of its action, the agent receives a numerical reward: \(R_{t+1} \in \mathcal{R} \subset \mathbb{R}\).</li>
+<li>The environment transitions into a new state: \(S_{t+1} \in \mathcal{S}\).</li>
+</ul>
+<p>This interaction generates a sequential trajectory of random variables:</p>
+<div class="eq">$$S_0 \longrightarrow A_0 \longrightarrow (S_1, R_1) \longrightarrow A_1 \longrightarrow (S_2, R_2) \longrightarrow A_2 \longrightarrow (S_3, R_3) \longrightarrow \ldots$$</div>
+<figure class="fig"><svg viewBox="0 0 680 210" role="img" aria-label="Agent-environment loop"><rect class="fq" x="40" y="70" width="170" height="70" rx="12"/><text x="125" y="102" text-anchor="middle" class="b">Agent</text><text x="125" y="122" text-anchor="middle" class="sm">policy π(a | s)</text>
+<rect class="fv" x="450" y="70" width="190" height="70" rx="12"/><text x="545" y="102" text-anchor="middle" class="b">Environment</text><text x="545" y="122" text-anchor="middle" class="sm">dynamics p(s′, r | s, a)</text>
+<path class="arrq" d="M210,85 C300,30 360,30 448,85"/><text x="330" y="38" text-anchor="middle" style="fill:#2a78d6" class="b">action A_t</text>
+<path class="arrv" d="M450,125 C360,185 300,185 212,125"/><text x="330" y="172" text-anchor="middle" style="fill:#0f7a54" class="b">reward R_t+1, next state S_t+1</text>
+<text x="330" y="200" text-anchor="middle" class="xs">one time step: t → t+1</text></svg><figcaption><b>The agent–environment loop.</b> The agent picks an action from its policy; the environment answers with a reward and a next state, drawn from its dynamics. Both terms are defined in the bytes below.</figcaption></figure>
+
+<h3 id="drone">The running example: an autonomous delivery drone <span class="badge-sup">supplement</span></h3>
+<p>Every byte checks its equations on one small MDP, the same one used throughout <a href="../dynamic-programming/">Lecture 2</a>. A delivery drone manages its battery across \(N = 3\) states and \(|\mathcal{A}| = 2\) actions, with \(\gamma = 0.8\). All numbers are hand-chosen teaching values, not measurements of a real system.</p>
+<ul>
+<li>States \(\mathcal{S} = \{\text{High}\ (s_0),\ \text{Low}\ (s_1),\ \text{Critical}\ (s_2)\}\) — battery level.</li>
+<li>Actions \(\mathcal{A} = \{\text{Deliver}\ (a_0),\ \text{Recharge}\ (a_1)\}\).</li>
+</ul>
+<div class="tw"><table class="t">
+<tr><th>State \(s\)</th><th class="c">reward, Deliver</th><th class="c">reward, Recharge</th><th class="c">next-state probabilities, Deliver<br>[High, Low, Crit]</th><th class="c">next-state probabilities, Recharge<br>[High, Low, Crit]</th></tr>
+<tr><td>High</td><td class="c">\(+10\)</td><td class="c">\(0\)</td><td class="c">[0.4, 0.6, 0.0]</td><td class="c">[1.0, 0.0, 0.0]</td></tr>
+<tr><td>Low</td><td class="c">\(+6\)</td><td class="c">\(-1\)</td><td class="c">[0.0, 0.3, 0.7]</td><td class="c">[0.8, 0.2, 0.0]</td></tr>
+<tr><td>Critical</td><td class="c">\(-5\)</td><td class="c">\(-2\)</td><td class="c">[0.0, 0.0, 1.0]</td><td class="c">[0.5, 0.5, 0.0]</td></tr>
+</table></div>
+<figure class="fig"><svg viewBox="0 0 700 250" role="img" aria-label="Delivery drone MDP transition diagram"><text x="170" y="22" text-anchor="middle" class="b" style="fill:#2a78d6">Deliver (a₀)</text><path d="M48,104 C26,46 94,46 72,104" fill="none" stroke="#2a78d6" stroke-width="1.7" marker-end="url(#ahq)"/><text x="60" y="56" text-anchor="middle" class="sm b">0.4</text><path d="M78,112 Q115.0,74 152,112" fill="none" stroke="#2a78d6" stroke-width="1.7" marker-end="url(#ahq)"/><text x="115.0" y="88.0" text-anchor="middle" class="sm b">0.6</text><path d="M158,104 C136,46 204,46 182,104" fill="none" stroke="#2a78d6" stroke-width="1.7" marker-end="url(#ahq)"/><text x="170" y="56" text-anchor="middle" class="sm b">0.3</text><path d="M188,112 Q225.0,74 262,112" fill="none" stroke="#2a78d6" stroke-width="1.7" marker-end="url(#ahq)"/><text x="225.0" y="88.0" text-anchor="middle" class="sm b">0.7</text><path d="M268,104 C246,46 314,46 292,104" fill="none" stroke="#2a78d6" stroke-width="1.7" marker-end="url(#ahq)"/><text x="280" y="56" text-anchor="middle" class="sm b">1</text><circle cx="60" cy="130" r="27" fill="#fff" stroke="#52514e" stroke-width="1.4"/><text x="60" y="128" text-anchor="middle" class="sm b">High</text><text x="60" y="143" text-anchor="middle" class="xs">r = +10</text><circle cx="170" cy="130" r="27" fill="#fff" stroke="#52514e" stroke-width="1.4"/><text x="170" y="128" text-anchor="middle" class="sm b">Low</text><text x="170" y="143" text-anchor="middle" class="xs">r = +6</text><circle cx="280" cy="130" r="27" fill="#fff" stroke="#52514e" stroke-width="1.4"/><text x="280" y="128" text-anchor="middle" class="sm b">Crit</text><text x="280" y="143" text-anchor="middle" class="xs">r = -5</text><text x="520" y="22" text-anchor="middle" class="b" style="fill:#eb6834">Recharge (a₁)</text><path d="M398,104 C376,46 444,46 422,104" fill="none" stroke="#eb6834" stroke-width="1.7" marker-end="url(#ahk)"/><text x="410" y="56" text-anchor="middle" class="sm b">1</text><path d="M502,148 Q465.0,200 428,148" fill="none" stroke="#eb6834" stroke-width="1.7" marker-end="url(#ahk)"/><rect x="452.0" y="166.0" width="26" height="15" rx="4" fill="#fff"/><text x="465.0" y="178.0" text-anchor="middle" class="sm b">0.8</text><path d="M508,104 C486,46 554,46 532,104" fill="none" stroke="#eb6834" stroke-width="1.7" marker-end="url(#ahk)"/><text x="520" y="56" text-anchor="middle" class="sm b">0.2</text><path d="M612,148 Q520.0,300 428,148" fill="none" stroke="#eb6834" stroke-width="1.7" marker-end="url(#ahk)"/><rect x="507.0" y="216.0" width="26" height="15" rx="4" fill="#fff"/><text x="520.0" y="228.0" text-anchor="middle" class="sm b">0.5</text><path d="M612,148 Q575.0,200 538,148" fill="none" stroke="#eb6834" stroke-width="1.7" marker-end="url(#ahk)"/><rect x="562.0" y="166.0" width="26" height="15" rx="4" fill="#fff"/><text x="575.0" y="178.0" text-anchor="middle" class="sm b">0.5</text><circle cx="410" cy="130" r="27" fill="#fff" stroke="#52514e" stroke-width="1.4"/><text x="410" y="128" text-anchor="middle" class="sm b">High</text><text x="410" y="143" text-anchor="middle" class="xs">r = +0</text><circle cx="520" cy="130" r="27" fill="#fff" stroke="#52514e" stroke-width="1.4"/><text x="520" y="128" text-anchor="middle" class="sm b">Low</text><text x="520" y="143" text-anchor="middle" class="xs">r = -1</text><circle cx="630" cy="130" r="27" fill="#fff" stroke="#52514e" stroke-width="1.4"/><text x="630" y="128" text-anchor="middle" class="sm b">Crit</text><text x="630" y="143" text-anchor="middle" class="xs">r = -2</text><line x1="345" x2="345" y1="30" y2="240" class="grid"/></svg><figcaption><b>The drone MDP.</b> Left: where Deliver takes you (it drains the battery). Right: where Recharge takes you. Arrow labels are probabilities; inside each state is the reward for that action. In this example the reward depends only on \((s,a)\), not on where you land.</figcaption></figure>
+</section>
+
+<section class="byte" id="b1">
+<h2><span class="num">1</span><span class="tt">The Markov property &amp; transition dynamics</span></h2>
+<h3>General history-dependent distribution</h3>
+<p>In an arbitrary stochastic process, the joint probability of reaching state \(s'\) with reward \(r\) at time \(t+1\) depends on the entire historical sequence of past states, actions, and rewards:</p>
+<div class="eq">$$P(S_{t+1}=s', R_{t+1}=r \mid S_t=s_t, A_t=a_t, R_t=r_t, S_{t-1}=s_{t-1}, A_{t-1}=a_{t-1}, \ldots, S_0=s_0, A_0=a_0)$$</div>
+<h3>The Markov property definition</h3>
+<p>A state \(S_t\) satisfies the <b>Markov property</b> if and only if the conditional probability distribution of future states and rewards depends <i>only</i> upon the present state and action, rendered conditionally independent of all past history.</p>
+<div class="eq">$$\begin{aligned}&P(S_{t+1}=s', R_{t+1}=r \mid S_t=s_t, A_t=a_t, S_{t-1}=s_{t-1}, \ldots, S_0=s_0)\\ &= P(S_{t+1}=s', R_{t+1}=r \mid S_t=s_t, A_t=a_t)\end{aligned}$$</div>
+<p>If a state possesses the Markov property, it retains all relevant information from the past to predict the future.</p>
+<div class="call ex sup"><b>Drone check <span class="badge-sup">supplement</span></b>If the drone is in Low and delivers, the chance of ending in Critical is \(0.7\) — whether it got to Low by delivering from High a moment ago or after a long recharge. The battery level alone is enough to predict what happens next; that is exactly what makes "battery level" a Markov state. If, say, an ageing battery drained faster after many flights, the battery level alone would no longer be Markov, and we would add the flight count to the state.</div>
+
+<h3>Four-argument joint transition dynamics</h3>
+<p>For a Markov Decision Process (MDP) with finite state and reward spaces, the environment's response is fully defined by a four-argument transition function \(p : \mathcal{S}\times\mathcal{R}\times\mathcal{S}\times\mathcal{A} \to [0,1]\):</p>
+<div class="eq">$$p(s', r \mid s, a) \doteq P(S_{t+1}=s', R_{t+1}=r \mid S_t=s, A_t=a)$$<div class="where">\(\doteq\) means "is defined as". \(s, a\): where you are and what you do now; \(s', r\): what the environment returns.</div></div>
+<h3>Probability axiom</h3>
+<p>Because \(p(s', r \mid s, a)\) is a valid conditional probability distribution for every state–action pair \((s,a)\), the sum of probabilities over all possible next states \(s'\) and rewards \(r\) must equal 1:</p>
+<div class="eq">$$\sum_{s' \in \mathcal{S}} \sum_{r \in \mathcal{R}} p(s', r \mid s, a) = 1 \quad \forall\, s \in \mathcal{S},\ a \in \mathcal{A}(s)$$</div>
+<div class="call ex sup"><b>Drone check <span class="badge-sup">supplement</span></b>Take \((s,a) = (\text{Low}, \text{Deliver})\). Delivering from Low always pays \(r = +6\), so \(p\) puts mass only on \(r=6\): \(p(\text{Low}, 6 \mid \text{Low}, \text{Del}) = 0.3\) and \(p(\text{Crit}, 6 \mid \text{Low}, \text{Del}) = 0.7\). Every other \((s', r)\) pair has probability 0. Sum: \(0.3 + 0.7 = 1\) ✓. In an environment with random rewards (a tip, say) the same 1.0 would be spread over several values of \(r\).</div>
+</section>
+
+<section class="byte extra" id="bg-marg">
+<h2><span class="num">B1</span><span class="tt">Background: marginal probability (the sum rule)</span> <span class="badge-sup">supplement</span></h2>
+<p><b>Why it is needed.</b> Byte 2 sums \(p(s', r \mid s,a)\) over \(r\). That step is the <b>sum rule</b> of probability.</p>
+<div class="eq">$$P(X = x) = \sum_{y} P(X = x, Y = y)$$<div class="where">To get the probability of \(X\) alone (its <b>marginal</b>), add the joint probability over every value \(Y\) can take. The name comes from old tables, where these row sums were written in the margin.</div></div>
+<p><b>Example.</b> A joint table over (weather, bus late): P(rain, late) = 0.20, P(rain, on time) = 0.10, P(dry, late) = 0.15, P(dry, on time) = 0.55. Then P(rain) = 0.20 + 0.10 = 0.30. Sanity check: P(rain) + P(dry) = 0.30 + 0.70 = 1.</p>
+<p>The same rule holds inside a condition: \(P(X=x \mid C) = \sum_y P(X=x, Y=y \mid C)\).</p>
+</section>
+
+<section class="byte" id="b2">
+<h2><span class="num">2</span><span class="tt">Marginalization of dynamics</span></h2>
+<p>From the complete four-argument joint transition distribution \(p(s', r \mid s, a)\), we can compute intermediate quantities by marginalizing over unneeded random variables.</p>
+<h3>State transition probability</h3>
+<p>The two-argument state transition probability \(P(s' \mid s, a)\) defines the likelihood of transitioning to state \(s'\) given current state \(s\) and action \(a\), regardless of the immediate reward received:</p>
+<div class="eq">$$P(s' \mid s, a) \doteq P(S_{t+1}=s' \mid S_t=s, A_t=a) = \sum_{r \in \mathcal{R}} p(s', r \mid s, a)$$</div>
+<p><b>Why marginalize over \(r\)?</b> Marginalizing over rewards isolates spatial and structural routing dynamics from scalar reward noise or feedback variance. It allows us to analyze how an agent moves through state space independently of the specific payoff structure.</p>
+<h3>Expected immediate reward</h3>
+<p>The expected immediate reward function \(R(s,a)\) computes the expected value of the reward \(R_{t+1}\) given state \(s\) and action \(a\):</p>
+<div class="eq">$$R(s,a) \doteq \mathbb{E}[R_{t+1} \mid S_t=s, A_t=a] = \sum_{r \in \mathcal{R}} r \cdot P(R_{t+1}=r \mid S_t=s, A_t=a) = \sum_{s' \in \mathcal{S}} \sum_{r \in \mathcal{R}} r \cdot p(s', r \mid s, a)$$<div class="where">An expected value is a probability-weighted average of the possible values (made precise in <a href="#bg-exp">Byte B2</a>).</div></div>
+<div class="call ex sup"><b>Drone check <span class="badge-sup">supplement</span></b>From Byte 1, \((\text{Low}, \text{Deliver})\) has mass 0.3 on \((\text{Low}, 6)\) and 0.7 on \((\text{Crit}, 6)\).<br>
+\(P(\text{Crit} \mid \text{Low}, \text{Del}) = \sum_r p(\text{Crit}, r \mid \text{Low}, \text{Del}) = 0.7\), and the row \(P(\cdot \mid \text{Low}, \text{Del}) = [0.0, 0.3, 0.7]\) is the row shown in the example table.<br>
+\(R(\text{Low}, \text{Del}) = 6\cdot 0.3 + 6 \cdot 0.7 = 6\). Because this drone's reward is fixed for each \((s,a)\), \(R(s,a)\) is just the table value. These two marginals, \(P\) and \(R\), are all the dynamic-programming algorithms of Lecture 2 need.</div>
+<div class="call shape"><b>Shape check</b>For each fixed action \(a\), \(P(\cdot \mid \cdot, a)\) is an \(N \times N\) table whose rows sum to 1; \(R(\cdot, \cdot)\) is an \(N \times |\mathcal{A}|\) table in reward units.</div>
+</section>
+
+<!-- ============================================================ -->
+<div class="part" id="part-pol" data-short="Policies, returns, values">
+<div class="pn">Bytes 3–5</div><h1>What the agent does, and what it wants</h1>
+<p>The policy describes behavior; the return measures success; value functions predict the return.</p>
+</div>
+
+<section class="byte" id="b3">
+<h2><span class="num">3</span><span class="tt">The agent's policy (\(\pi\))</span></h2>
+<p>A <b>policy</b> \(\pi\) defines the agent's behavior at any given state.</p>
+<h3>Formal definition</h3>
+<p>A stochastic policy \(\pi(a \mid s)\) specifies the probability distribution over actions \(a \in \mathcal{A}(s)\) given state \(s\):</p>
+<div class="eq">$$\pi(a \mid s) \doteq P(A_t = a \mid S_t = s)$$</div>
+<h3>Probability axioms</h3>
+<p>For all states \(s \in \mathcal{S}\):</p>
+<div class="eq">$$\sum_{a \in \mathcal{A}(s)} \pi(a \mid s) = 1 \qquad\qquad \pi(a \mid s) \ge 0 \quad \forall\, a \in \mathcal{A}(s)$$</div>
+<h3>Policy variants</h3>
+<ul>
+<li><b>Stochastic policy:</b> \(\pi(a \mid s) \in [0,1]\). The agent samples actions probabilistically, enabling exploration and optimal play in partially observable or competitive settings.</li>
+<li><b>Deterministic policy:</b> \(\pi(s) = a\). The agent deterministically maps state \(s\) to a single action \(a\), placing all probability mass on one action:
+$$\pi(a \mid s) = \begin{cases} 1 & \text{if } a = \pi(s) \\ 0 & \text{if } a \ne \pi(s) \end{cases}$$</li>
+</ul>
+<div class="call ex sup"><b>Drone check <span class="badge-sup">supplement</span></b>The deterministic policy \(\pi_1 = (\text{Deliver}, \text{Deliver}, \text{Recharge})\) (one action per state, in the order High, Low, Critical) has \(\pi_1(\text{Del} \mid \text{High}) = 1,\ \pi_1(\text{Rech} \mid \text{High}) = 0\), and so on. A stochastic alternative, \(\pi_{\text{mix}}\), is the same except that in Low it flips a fair coin: \(\pi_{\text{mix}}(\text{Del} \mid \text{Low}) = \pi_{\text{mix}}(\text{Rech} \mid \text{Low}) = 0.5\). Each row sums to 1 ✓. We reuse \(\pi_{\text{mix}}\) in Bytes B2 and 7.</div>
+</section>
+
+<section class="byte" id="b4">
+<h2><span class="num">4</span><span class="tt">The discounted cumulative return (\(G_t\))</span></h2>
+<p>The goal of the agent is to maximize long-term cumulative reward, formally known as the <b>return</b>.</p>
+<h3>Definition</h3>
+<p>The discounted cumulative return \(G_t\) from time step \(t\) onward is defined as:</p>
+<div class="eq">$$G_t \doteq R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \ldots = \sum_{k=0}^{\infty} \gamma^{k} R_{t+k+1}$$<div class="where">where \(\gamma \in [0,1)\) is the discount factor: a reward \(k\) steps away counts \(\gamma^k\) as much as one received now.</div></div>
+<div class="call note sup"><b>Note on \(\gamma = 1\) <span class="badge-sup">supplement</span></b>For <b>episodic</b> tasks (which always end, e.g. a game), \(\gamma = 1\) is also allowed, because the sum then has finitely many terms. Requiring \(\gamma &lt; 1\) is what we need for <b>continuing</b> tasks, and it is what Lecture 2's convergence proofs use.</div>
+<h3>Role of the discount factor (\(\gamma\))</h3>
+<ul>
+<li><b>Mathematical convergence:</b> ensures that \(G_t\) remains finite for continuing tasks with infinite horizons, provided rewards are bounded: \(|R_t| \le R_{\max} \implies |G_t| \le \dfrac{R_{\max}}{1-\gamma}\).
+<span class="badge-sup">corrected</span> <small>(the bound is on \(|G_t|\); it follows from the geometric series \(1 + \gamma + \gamma^2 + \ldots = 1/(1-\gamma)\).)</small></li>
+<li><b>Temporal preference &amp; uncertainty:</b> reflects preference for immediate rewards over deferred rewards, modeling interest rates, risk, or environment non-stationarity.</li>
+</ul>
+<h3>Fundamental recursive identity</h3>
+<p>The return \(G_t\) can be split recursively into immediate reward plus the discounted return of the next time step:</p>
+<div class="eq">$$\begin{aligned}G_t &= R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \gamma^3 R_{t+4} + \ldots\\ &= R_{t+1} + \gamma\left(R_{t+2} + \gamma R_{t+3} + \gamma^2 R_{t+4} + \ldots\right)\\ &= R_{t+1} + \gamma G_{t+1}\end{aligned}$$</div>
+<p>This recursive property is the structural foundation for all dynamic programming and temporal-difference algorithms.</p>
+<div class="call ex sup"><b>Drone check <span class="badge-sup">supplement</span></b>One possible episode fragment: High →(Deliver, \(+10\))→ Low →(Recharge, \(-1\))→ High →(Deliver, \(+10\)), and suppose the story stops there. With \(\gamma = 0.8\):<br>
+Directly: \(G_0 = 10 + 0.8(-1) + 0.8^2(10) = 10 - 0.8 + 6.4 = 15.60\).<br>
+Backwards with the recursion: \(G_2 = 10\); \(G_1 = -1 + 0.8 \cdot 10 = 7.00\); \(G_0 = 10 + 0.8 \cdot 7 = 15.60\) ✓ — same number, computed from the end.<br>
+Bound: the largest reward is \(R_{\max} = 10\), so no return in this MDP can exceed \(10 / (1 - 0.8) = 50\) in absolute value.</div>
+<div class="call shape"><b>Units check</b>\(\gamma\) is unitless, so \(G_t\) has the same units as the rewards.</div>
+</section>
+
+<section class="byte extra" id="bg-exp">
+<h2><span class="num">B2</span><span class="tt">Background: expectation, conditioning and the law of total expectation</span> <span class="badge-sup">supplement</span></h2>
+<p><b>Why it is needed.</b> \(G_t\) is random (actions and transitions are random), so we cannot ask for "the" return of a state, only its <b>average</b>. Byte 5 defines values as expectations, and Byte 6 manipulates them with three rules collected here.</p>
+<div class="eq">$$\mathbb{E}[X] = \sum_{x} x\, P(X = x) \qquad \mathbb{E}[X \mid C] = \sum_{x} x\, P(X = x \mid C)$$<div class="where">The expectation is a probability-weighted average of the values \(X\) can take; conditioning on \(C\) just uses the conditional probabilities. \(\mathbb{E}_{\pi}\) means "actions are drawn from \(\pi\)".</div></div>
+<ol>
+<li><b>Linearity:</b> \(\mathbb{E}[X + cY \mid C] = \mathbb{E}[X \mid C] + c\, \mathbb{E}[Y \mid C]\) for a constant \(c\).</li>
+<li><b>Constants come out:</b> if \(C\) fixes \(X = x\), then \(\mathbb{E}[X \mid C] = x\).</li>
+<li><b>Law of total expectation:</b> to average over \(X\), first split by the value of some other variable \(Y\), average within each case, then weight the cases:
+$$\mathbb{E}[X \mid C] = \sum_{y} P(Y = y \mid C)\ \mathbb{E}[X \mid C, Y = y]$$</li>
+</ol>
+<p><b>Example (drone).</b> Under \(\pi_{\text{mix}}\) in state Low, what reward do we expect on the next step? Split by the action (rule 3): \(\mathbb{E}_{\pi_{\text{mix}}}[R_{t+1} \mid S_t = \text{Low}] = 0.5 \cdot R(\text{Low}, \text{Del}) + 0.5 \cdot R(\text{Low}, \text{Rech}) = 0.5(6) + 0.5(-1) = 2.50\). Sanity check: the answer lies between the two possible rewards, \(-1\) and \(6\), as any average must.</p>
+</section>
+
+<section class="byte" id="b5">
+<h2><span class="num">5</span><span class="tt">The value functions (\(V^{\pi}\) and \(Q^{\pi}\))</span></h2>
+<p>Value functions estimate how good it is for an agent to be in a given state (or perform a given action in a given state) under a specific policy \(\pi\).</p>
+<h3>State-value function (\(V^{\pi}\))</h3>
+<p>The state-value function \(V^{\pi}(s)\) is the expected return starting from state \(s\) at time step \(t\) and following policy \(\pi\) thereafter:</p>
+<div class="eq">$$V^{\pi}(s) \doteq \mathbb{E}_{\pi}[G_t \mid S_t = s]$$</div>
+<h3>Action-value function (\(Q^{\pi}\))</h3>
+<p>The action-value function \(Q^{\pi}(s,a)\) is the expected return starting from state \(s\), taking action \(a\), and thereafter following policy \(\pi\):</p>
+<div class="eq">$$Q^{\pi}(s,a) \doteq \mathbb{E}_{\pi}[G_t \mid S_t = s, A_t = a]$$</div>
+<div class="call ex sup"><b>Reading the numbers <span class="badge-sup">supplement</span></b>For the drone policy \(\pi^{*} = (\text{Deliver}, \text{Recharge}, \text{Recharge})\) we will find (Byte 8) \(V^{\pi^*} = \left[30.0000,\ 21.6667,\ 18.6667\right]^{T}\). Read \(V^{\pi^*}(\text{High}) = 30\) as: "start fully charged, follow \(\pi^*\) forever, and the discounted rewards add up to 30 on average." Some runs earn more, some less; 30 is the mean. It stays below the bound of 50 from Byte 4, as it must.</div>
+<div class="call shape"><b>Shape check</b>\(V^{\pi}\) is one number per state (\(N\) numbers); \(Q^{\pi}\) is one number per state–action pair (an \(N \times |\mathcal{A}|\) table). Both are in reward units.</div>
+</section>
+
+<!-- ============================================================ -->
+<div class="part" id="part-bell" data-short="Bellman equations">
+<div class="pn">Bytes 6–9</div><h1>The Bellman equations</h1>
+<p>Values satisfy self-consistency equations: first for a fixed policy (linear), then for the best policy (non-linear).</p>
+</div>
+
+<section class="byte" id="b6">
+<h2><span class="num">6</span><span class="tt">Step-by-step derivation of the Bellman expectation equation for \(V^{\pi}(s)\)</span></h2>
+<p>Here is the analytical derivation decomposing \(V^{\pi}(s)\) into immediate expected rewards and discounted downstream values. Each step uses one rule from <a href="#bg-exp">Byte B2</a> or the Markov property (<a href="#b1">Byte 1</a>).</p>
+<h3>Step A: substitute the recursive return</h3>
+<p>Start with the definition of the state-value function and expand \(G_t\) using its recursive identity (<a href="#b4">Byte 4</a>):</p>
+<div class="eq">$$V^{\pi}(s) = \mathbb{E}_{\pi}[G_t \mid S_t = s] = \mathbb{E}_{\pi}[R_{t+1} + \gamma G_{t+1} \mid S_t = s]$$</div>
+<h3>Step B: condition on action selection (law of total expectation)</h3>
+<p>To evaluate the expectation, expand over all candidate actions \(a \in \mathcal{A}(s)\) chosen by policy \(\pi(a \mid s)\):</p>
+<div class="eq">$$\begin{aligned}V^{\pi}(s) &= \sum_{a \in \mathcal{A}(s)} P(A_t = a \mid S_t = s) \cdot \mathbb{E}_{\pi}[R_{t+1} + \gamma G_{t+1} \mid S_t = s, A_t = a]\\ &= \sum_{a \in \mathcal{A}(s)} \pi(a \mid s) \cdot \mathbb{E}_{\pi}[R_{t+1} + \gamma G_{t+1} \mid S_t = s, A_t = a]\end{aligned}$$</div>
+<h3>Step C: condition on environment response (law of total expectation)</h3>
+<p>Condition the inner expectation over all possible outcomes realized by the environment — specifically next state \(s'\) and reward \(r\) — weighted by \(p(s', r \mid s, a)\):</p>
+<div class="eq">$$V^{\pi}(s) = \sum_{a \in \mathcal{A}(s)} \pi(a \mid s) \sum_{s' \in \mathcal{S}} \sum_{r \in \mathcal{R}} p(s', r \mid s, a) \cdot \mathbb{E}_{\pi}[R_{t+1} + \gamma G_{t+1} \mid S_t = s, A_t = a, S_{t+1} = s', R_{t+1} = r]$$</div>
+<h3>Step D: linearity of expectation and constant evaluation</h3>
+<p>Apply linearity of expectation to split the sum into the immediate concrete reward \(r\) and future expected returns:</p>
+<div class="eq">$$\begin{aligned}&\mathbb{E}_{\pi}[R_{t+1} + \gamma G_{t+1} \mid S_t = s, A_t = a, S_{t+1} = s', R_{t+1} = r]\\ &= r + \gamma \cdot \mathbb{E}_{\pi}[G_{t+1} \mid S_t = s, A_t = a, S_{t+1} = s', R_{t+1} = r]\end{aligned}$$</div>
+<h3>Step E: Markov simplification</h3>
+<p>By the <b>Markov property</b>, the distribution of \(G_{t+1}\) depends strictly upon the current state \(S_{t+1} = s'\). Historical variables \(S_t = s\), \(A_t = a\), and immediate reward \(R_{t+1} = r\) provide no additional information about future trajectories:</p>
+<div class="eq">$$\mathbb{E}_{\pi}[G_{t+1} \mid S_t = s, A_t = a, S_{t+1} = s', R_{t+1} = r] = \mathbb{E}_{\pi}[G_{t+1} \mid S_{t+1} = s'] = V^{\pi}(s')$$</div>
+<h3>Step F: reassembly into the Bellman expectation equation</h3>
+<p>Substitute the simplified terms back into the overall expansion to yield the <b>Bellman Expectation Equation for \(V^{\pi}(s)\)</b>:</p>
+<div class="eq">$$V^{\pi}(s) = \sum_{a \in \mathcal{A}(s)} \pi(a \mid s) \sum_{s' \in \mathcal{S}} \sum_{r \in \mathcal{R}} p(s', r \mid s, a)\left[r + \gamma V^{\pi}(s')\right]$$</div>
+<figure class="fig"><svg viewBox="0 0 680 245" role="img" aria-label="Backup diagram"><circle cx="330" cy="30" r="14" fill="#fff" stroke="#1b1b1a" stroke-width="1.6"/><text x="352" y="34" class="sm b">s</text><line x1="330" y1="44" x2="190" y2="93" stroke="#6250d6" stroke-width="1.6"/><text x="214.0" y="65.0" class="sm" style="fill:#6250d6">π(Deliver | s)</text><circle cx="190" cy="100" r="7" fill="#1b1b1a"/><text x="202" y="104" class="xs">a = Deliver</text><line x1="190" y1="107" x2="100" y2="176" stroke="#1baf7a" stroke-width="1.4"/><circle cx="100" cy="190" r="14" fill="#fff" stroke="#1b1b1a" stroke-width="1.4"/><text x="100" y="194" text-anchor="middle" class="xs b">s′0</text><line x1="190" y1="107" x2="190" y2="176" stroke="#1baf7a" stroke-width="1.4"/><circle cx="190" cy="190" r="14" fill="#fff" stroke="#1b1b1a" stroke-width="1.4"/><text x="190" y="194" text-anchor="middle" class="xs b">s′1</text><line x1="190" y1="107" x2="280" y2="176" stroke="#1baf7a" stroke-width="1.4"/><circle cx="280" cy="190" r="14" fill="#fff" stroke="#1b1b1a" stroke-width="1.4"/><text x="280" y="194" text-anchor="middle" class="xs b">s′2</text><text x="190" y="232" text-anchor="middle" class="xs" style="fill:#0f7a54">weights p(s′, r | s, a); value r + γV(s′) at each leaf</text><line x1="330" y1="44" x2="470" y2="93" stroke="#6250d6" stroke-width="1.6"/><text x="410.0" y="65.0" class="sm" style="fill:#6250d6">π(Recharge | s)</text><circle cx="470" cy="100" r="7" fill="#1b1b1a"/><text x="482" y="104" class="xs">a = Recharge</text><line x1="470" y1="107" x2="380" y2="176" stroke="#1baf7a" stroke-width="1.4"/><circle cx="380" cy="190" r="14" fill="#fff" stroke="#1b1b1a" stroke-width="1.4"/><text x="380" y="194" text-anchor="middle" class="xs b">s′0</text><line x1="470" y1="107" x2="470" y2="176" stroke="#1baf7a" stroke-width="1.4"/><circle cx="470" cy="190" r="14" fill="#fff" stroke="#1b1b1a" stroke-width="1.4"/><text x="470" y="194" text-anchor="middle" class="xs b">s′1</text><line x1="470" y1="107" x2="560" y2="176" stroke="#1baf7a" stroke-width="1.4"/><circle cx="560" cy="190" r="14" fill="#fff" stroke="#1b1b1a" stroke-width="1.4"/><text x="560" y="194" text-anchor="middle" class="xs b">s′2</text><text x="470" y="232" text-anchor="middle" class="xs" style="fill:#0f7a54">weights p(s′, r | s, a); value r + γV(s′) at each leaf</text><text x="20" y="34" class="xs">state</text><text x="20" y="104" class="xs">action</text><text x="20" y="194" class="xs">next state</text></svg><figcaption><b>Backup diagram of the equation.</b> Read it top-down: from state \(s\), branch over actions weighted by \(\pi(a\mid s)\) (Step B), then over outcomes weighted by \(p(s', r \mid s,a)\) (Step C); at each leaf take \(r + \gamma V^{\pi}(s')\) (Steps D–E), and average back up.</figcaption></figure>
+<div class="call ex sup"><b>Drone check <span class="badge-sup">supplement</span></b>The equation says that the values of a policy must be <i>consistent</i> with each other. Check the claimed values \(V^{\pi^*} = \left[30.0000,\ 21.6667,\ 18.6667\right]^{T}\) (computed in Byte 8) for \(\pi^* = (\text{Del}, \text{Rech}, \text{Rech})\). With a deterministic policy and fixed rewards, the sums collapse to \(R(s,\pi(s)) + \gamma \sum_{s'} P(s' \mid s, \pi(s)) V(s')\):<br>
+High (Deliver): \(10 + 0.8(0.4 \cdot 30 + 0.6 \cdot 21.6667) = 10 + 0.8(25.0000) = 30.0000\) ✓<br>
+Low (Recharge): \(-1 + 0.8(0.8 \cdot 30 + 0.2 \cdot 21.6667) = -1 + 0.8(28.3333) = 21.6667\) ✓<br>
+Critical (Recharge): \(-2 + 0.8(0.5 \cdot 30 + 0.5 \cdot 21.6667) = -2 + 0.8(25.8333) = 18.6667\) ✓<br>
+Each value reproduces itself. A wrong guess, such as \(V = [0,0,0]\), would not: the right side would give \([10, -1, -2]\).</div>
+</section>
+
+<section class="byte" id="b7">
+<h2><span class="num">7</span><span class="tt">Mutually recursive relationship between \(V^{\pi}\) and \(Q^{\pi}\)</span></h2>
+<p>The state-value function \(V^{\pi}\) and action-value function \(Q^{\pi}\) depend directly on one another.</p>
+<h3>Expressing \(V^{\pi}(s)\) via \(Q^{\pi}(s,a)\)</h3>
+<p>The value of a state equals the expected action-value across all policy-weighted actions:</p>
+<div class="eq">$$V^{\pi}(s) = \sum_{a \in \mathcal{A}(s)} \pi(a \mid s)\, Q^{\pi}(s,a)$$</div>
+<h3>Expressing \(Q^{\pi}(s,a)\) via \(V^{\pi}(s')\)</h3>
+<p>The value of taking an action in a state equals expected immediate reward plus the discounted value of the resulting next state:</p>
+<div class="eq">$$Q^{\pi}(s,a) = \sum_{s' \in \mathcal{S}} \sum_{r \in \mathcal{R}} p(s', r \mid s, a)\left[r + \gamma V^{\pi}(s')\right]$$</div>
+<h3>Bellman expectation equation for \(Q^{\pi}(s,a)\)</h3>
+<p>Substituting the expression for \(V^{\pi}(s')\) into \(Q^{\pi}(s,a)\) yields the self-consistent recursive equation for action values:</p>
+<div class="eq">$$Q^{\pi}(s,a) = \sum_{s' \in \mathcal{S}} \sum_{r \in \mathcal{R}} p(s', r \mid s, a)\left[r + \gamma \sum_{a' \in \mathcal{A}(s')} \pi(a' \mid s')\, Q^{\pi}(s', a')\right]$$</div>
+<div class="call ex sup"><b>Drone check <span class="badge-sup">supplement</span></b>For the stochastic \(\pi_{\text{mix}}\) of Byte 3 (coin flip in Low), the values are \(V^{\pi_{\text{mix}}} = \left[29.9877,\ 21.6493,\ 18.6548\right]^{T}\) (computed with the method of Byte 8). In Low:<br>
+\(Q^{\pi_{\text{mix}}}(\text{Low}, \text{Del}) = 6 + 0.8(0.3 \cdot 21.6493 + 0.7 \cdot 18.6548) = 21.6425\)<br>
+\(Q^{\pi_{\text{mix}}}(\text{Low}, \text{Rech}) = -1 + 0.8(0.8 \cdot 29.9877 + 0.2 \cdot 21.6493) = 21.6560\)<br>
+\(V^{\pi_{\text{mix}}}(\text{Low}) = 0.5 \cdot 21.6425 + 0.5 \cdot 21.6560 = 21.6493\) ✓ — the state value is the policy-weighted average of the action values, and it sits between them.</div>
+</section>
+
+<section class="byte extra" id="bg-lin">
+<h2><span class="num">B3</span><span class="tt">Background: linear systems in matrix form</span> <span class="badge-sup">supplement</span></h2>
+<p><b>Why it is needed.</b> Byte 8 writes the \(N\) Bellman equations as one matrix equation and solves it.</p>
+<p>A set of \(N\) linear equations in \(N\) unknowns can be written \(M x = b\), where row \(i\) of the matrix \(M\) holds the coefficients of equation \(i\), \(x\) is the column of unknowns and \(b\) the right-hand sides. The product \(Mx\) is the column whose entry \(i\) is the dot product \(\sum_j M_{ij} x_j\). If \(M\) is invertible, the unique solution is \(x = M^{-1} b\). The identity matrix \(I\) (ones on the diagonal, zeros elsewhere) satisfies \(Ix = x\).</p>
+<p><b>Example.</b> \(x_1 = 1 + 0.5 x_2\) and \(x_2 = 2 + 0.5 x_1\). Move unknowns left: \(\begin{bmatrix}1 & -0.5\\ -0.5 & 1\end{bmatrix}\begin{bmatrix}x_1\\x_2\end{bmatrix} = \begin{bmatrix}1\\2\end{bmatrix}\), with solution \(x_1 = 8/3,\ x_2 = 10/3\). Check: \(1 + 0.5 \cdot 10/3 = 8/3\) ✓.</p>
+<p><b>Cost.</b> Solving a dense \(N\times N\) system by Gaussian elimination takes on the order of \(N^3\) operations, written \(O(N^3)\).</p>
+</section>
+
+<section class="byte" id="b8">
+<h2><span class="num">8</span><span class="tt">Vector–matrix formulation of policy evaluation</span></h2>
+<p>For finite MDPs with state space size \(|\mathcal{S}| = N\), we can express the Bellman Expectation Equation system using linear algebra.</p>
+<h3>Matrix equation form</h3>
+<p>Define:</p>
+<ul>
+<li>\(v^{\pi} \in \mathbb{R}^{N}\): state value vector, where \(v^{\pi}[i] = V^{\pi}(s_i)\).</li>
+<li>\(r^{\pi} \in \mathbb{R}^{N}\): expected immediate reward vector under policy \(\pi\), where \(r^{\pi}[i] = \sum_a \pi(a \mid s_i) \sum_{s', r} p(s', r \mid s_i, a)\, r\).</li>
+<li>\(P^{\pi} \in \mathbb{R}^{N \times N}\): policy state-transition probability matrix, where \(P^{\pi}[i,j] = \sum_a \pi(a \mid s_i) \sum_r p(s_j, r \mid s_i, a)\).</li>
+</ul>
+<p class="builds"><span class="badge-sup">notation unified</span> The original notes wrote \(v_\pi, r_\pi, P_\pi\) here; Lecture 2 uses \(v^{\pi}, r^{\pi}, P^{\pi}\). Both lectures now use the superscript form.</p>
+<p>The system of equations simplifies to:</p>
+<div class="eq">$$v^{\pi} = r^{\pi} + \gamma P^{\pi} v^{\pi}$$</div>
+<h3>Analytical solution</h3>
+<p>Rearranging terms using the identity matrix \(I \in \mathbb{R}^{N \times N}\):</p>
+<div class="eq">$$(I - \gamma P^{\pi})\, v^{\pi} = r^{\pi} \qquad\Longrightarrow\qquad v^{\pi} = (I - \gamma P^{\pi})^{-1} r^{\pi}$$</div>
+<p><b>Computational limits:</b> matrix inversion incurs a computational complexity of \(O(|\mathcal{S}|^3)\). Exact inversion becomes intractable for large state spaces (e.g., \(|\mathcal{S}| > 10^4\)). Consequently, practical implementations resort to iterative policy evaluation methods (dynamic programming, temporal-difference learning, or Monte Carlo sampling).</p>
+<div class="call ex sup"><b>Drone check <span class="badge-sup">supplement</span></b>For \(\pi^* = (\text{Del}, \text{Rech}, \text{Rech})\), pick from each state the row of the chosen action:
+$$r^{\pi^*} = \begin{bmatrix}10\\-1\\-2\end{bmatrix},\quad P^{\pi^*} = \begin{bmatrix}0.4 & 0.6 & 0.0\\ 0.8 & 0.2 & 0.0\\ 0.5 & 0.5 & 0.0\end{bmatrix},\quad I - 0.8P^{\pi^*} = \begin{bmatrix}0.68 & -0.48 & 0.00\\ -0.64 & 0.84 & 0.00\\ -0.40 & -0.40 & 1.00\end{bmatrix}$$
+The first two equations involve only High and Low: \(0.68x_0 - 0.48x_1 = 10\) and \(-0.64x_0 + 0.84x_1 = -1\), giving \(x_0 = 30,\ x_1 = 65/3 \approx 21.6667\). The third then gives \(x_2 = -2 + 0.4(30) + 0.4(21.6667) = 56/3 \approx 18.6667\). So \(v^{\pi^*} = \left[30.0000,\ 21.6667,\ 18.6667\right]^{T}\) — the values checked in Byte 6.<br>
+The same solve for \(\pi_1 = (\text{Del}, \text{Del}, \text{Rech})\) gives \(v^{\pi_1} = \left[29.9751,\ 21.6314,\ 18.6426\right]^{T}\), slightly lower in every state.</div>
+<div class="call shape"><b>Shape check</b>\(P^{\pi}\): \(N\times N\), rows sum to 1. \(r^{\pi}, v^{\pi}\): \(N\times 1\). \(P^{\pi} v^{\pi}\): \(N \times 1\) — entry \(i\) is the expected next-state value from \(s_i\).</div>
+</section>
+
+<section class="byte" id="b9">
+<h2><span class="num">9</span><span class="tt">Moving from evaluation to control (Bellman optimality)</span></h2>
+<h3>Partial ordering of policies</h3>
+<p>A policy \(\pi\) is defined to be better than or equal to a policy \(\pi'\) (\(\pi \ge \pi'\)) if and only if its expected return is greater than or equal to that of \(\pi'\) for all states:</p>
+<div class="eq">$$\pi \ge \pi' \iff V^{\pi}(s) \ge V^{\pi'}(s) \quad \forall\, s \in \mathcal{S}$$</div>
+<p>For a finite MDP, there is always at least one policy that is equal to or better than all other policies. This is an <b>optimal policy</b>, denoted \(\pi^{*}\).</p>
+<div class="call ex sup"><b>Why "partial" <span class="badge-sup">supplement</span></b>Two policies can be incomparable. For the drone, \(\pi_a = (\text{Del}, \text{Del}, \text{Del})\) has \(V = \left[7.2755,\ -10.5263,\ -25.0000\right]^{T}\) and \(\pi_b = (\text{Rech}, \text{Del}, \text{Rech})\) has \(V = \left[0.0000,\ 9.1045,\ 1.6418\right]^{T}\): \(\pi_a\) is better in High, \(\pi_b\) is better in Low and Critical, so neither \(\pi_a \ge \pi_b\) nor \(\pi_b \ge \pi_a\). Yet among all \(2^3 = 8\) deterministic policies, \((\text{Del}, \text{Rech}, \text{Rech})\) is \(\ge\) every one of them in every state (checked by evaluating all eight) — it is \(\pi^*\).</div>
+<h3>Optimal value functions</h3>
+<p>The optimal state-value function \(V^{*}(s)\) is the maximum state-value obtainable under any policy:</p>
+<div class="eq">$$V^{*}(s) \doteq \max_{\pi} V^{\pi}(s) \quad \forall\, s \in \mathcal{S}$$</div>
+<p>The <b>optimal action-value function</b> \(Q^{*}(s,a)\) is the maximum action-value obtainable under any policy:</p>
+<div class="eq">$$Q^{*}(s,a) \doteq \max_{\pi} Q^{\pi}(s,a) \quad \forall\, s \in \mathcal{S},\ a \in \mathcal{A}(s)$$</div>
+<p>This leads to the identity connecting \(V^{*}\) and \(Q^{*}\):</p>
+<div class="eq">$$V^{*}(s) = \max_{a \in \mathcal{A}(s)} Q^{*}(s,a)$$</div>
+<h3>Bellman optimality equation for \(V^{*}(s)\)</h3>
+<p>Because the optimal policy chooses the action that maximizes expected long-term return, the optimal state value must equal the maximum expected value across candidate actions:</p>
+<div class="eq">$$V^{*}(s) = \max_{a \in \mathcal{A}(s)} \sum_{s' \in \mathcal{S}} \sum_{r \in \mathcal{R}} p(s', r \mid s, a)\left[r + \gamma V^{*}(s')\right]$$</div>
+<h3>Bellman optimality equation for \(Q^{*}(s,a)\)</h3>
+<p>Similarly, the optimal action-value system satisfies:</p>
+<div class="eq">$$Q^{*}(s,a) = \sum_{s' \in \mathcal{S}} \sum_{r \in \mathcal{R}} p(s', r \mid s, a)\left[r + \gamma \max_{a' \in \mathcal{A}(s')} Q^{*}(s', a')\right]$$</div>
+<div class="call ex sup"><b>Drone check <span class="badge-sup">supplement</span></b>With \(V^* = \left[30.0000,\ 21.6667,\ 18.6667\right]^{T}\), compute \(Q^*(s,a) = R(s,a) + 0.8\sum_{s'} P(s' \mid s,a) V^*(s')\) for both actions and confirm that the max reproduces \(V^*\):
+<div class="tw"><table class="t">
+<tr><th>State</th><th class="c">\(Q^*(s, \text{Deliver})\)</th><th class="c">\(Q^*(s, \text{Recharge})\)</th><th class="c">max = \(V^*(s)\)?</th><th class="c">best action</th></tr>
+<tr><td>High</td><td class="c">30.0000</td><td class="c">24.0000</td><td class="c">30.0000 ✓</td><td class="c"><b>Deliver</b></td></tr>
+<tr><td>Low</td><td class="c">21.6533</td><td class="c">21.6667</td><td class="c">21.6667 ✓</td><td class="c"><b>Recharge</b></td></tr>
+<tr><td>Critical</td><td class="c">9.9333</td><td class="c">18.6667</td><td class="c">18.6667 ✓</td><td class="c"><b>Recharge</b></td></tr>
+</table></div>
+In Low the two actions differ by only \(0.0133\): delivering earns \(+6\) now but risks a 70% drop to Critical; recharging costs \(1\) but returns the drone to High 80% of the time.</div>
+<h3>Linear vs. non-linear systems</h3>
+<ul>
+<li><b>Bellman expectation equations</b> are <b>linear systems of equations</b> for a fixed policy \(\pi\). They can be solved analytically using matrix inversion or iteratively via linear operators.</li>
+<li><b>Bellman optimality equations</b> are <b>non-linear systems of equations</b> due to the presence of the non-linear \(\max\) operator. As a result, direct linear solvers cannot be used. We must use non-linear iterative algorithms such as <b>value iteration</b>, <b>policy iteration</b>, or <b>Q-learning</b> — the subject of <a href="../dynamic-programming/">Lecture 2</a>.</li>
+</ul>
+</section>
+
+<!-- ============================================================ -->
+<div class="part" id="part-end" data-short="Part 1 wrap-up">
+<div class="pn">Wrap-up</div><h1>Summary, mental model and review</h1>
+</div>
+
+<section class="byte extra" id="summary">
+<h2><span class="num">·</span><span class="tt">Quick-reference summary table</span></h2>
+<div class="tw"><table class="t">
+<tr><th>Concept</th><th>Mathematical formalism</th><th>Primary function / meaning</th></tr>
+<tr><td><b>Joint dynamics</b></td><td>\(p(s', r \mid s, a) = P(S_{t+1}=s', R_{t+1}=r \mid S_t=s, A_t=a)\)</td><td>Complete environment probabilistic response model.</td></tr>
+<tr><td><b>State transition</b></td><td>\(P(s' \mid s,a) = \sum_r p(s', r \mid s, a)\)</td><td>Probability of moving to \(s'\) from \((s,a)\) independent of reward.</td></tr>
+<tr><td><b>Stochastic policy</b></td><td>\(\pi(a \mid s) = P(A_t = a \mid S_t = s)\)</td><td>Action probability distribution selected by agent in state \(s\).</td></tr>
+<tr><td><b>Discounted return</b></td><td>\(G_t = \sum_{k=0}^{\infty} \gamma^k R_{t+k+1} = R_{t+1} + \gamma G_{t+1}\)</td><td>Target total discounted accumulation of future rewards.</td></tr>
+<tr><td><b>State-value (\(V^{\pi}\))</b></td><td>\(V^{\pi}(s) = \mathbb{E}_{\pi}[G_t \mid S_t = s]\)</td><td>Expected total discounted reward starting from state \(s\) under \(\pi\).</td></tr>
+<tr><td><b>Action-value (\(Q^{\pi}\))</b></td><td>\(Q^{\pi}(s,a) = \mathbb{E}_{\pi}[G_t \mid S_t = s, A_t = a]\)</td><td>Expected return taking action \(a\) in state \(s\), then following \(\pi\).</td></tr>
+<tr><td><b>Bellman expectation (\(V^{\pi}\))</b></td><td>\(V^{\pi}(s) = \sum_a \pi(a\mid s) \sum_{s',r} p(s',r \mid s,a)[r + \gamma V^{\pi}(s')]\)</td><td>Consistency identity for linear evaluation of policy \(\pi\).</td></tr>
+<tr><td><b>Bellman expectation (\(Q^{\pi}\))</b></td><td>\(Q^{\pi}(s,a) = \sum_{s',r} p(s',r \mid s,a)[r + \gamma \sum_{a'} \pi(a' \mid s') Q^{\pi}(s',a')]\)</td><td>Action-centric consistency identity under policy \(\pi\).</td></tr>
+<tr><td><b>Matrix form</b></td><td>\(v^{\pi} = r^{\pi} + \gamma P^{\pi} v^{\pi} \Rightarrow v^{\pi} = (I - \gamma P^{\pi})^{-1} r^{\pi}\)</td><td>Closed-form evaluation; \(O(N^3)\) cost.</td></tr>
+<tr><td><b>Bellman optimality (\(V^{*}\))</b></td><td>\(V^{*}(s) = \max_a \sum_{s',r} p(s',r \mid s,a)[r + \gamma V^{*}(s')]\)</td><td>Non-linear identity governing maximum achievable state values.</td></tr>
+<tr><td><b>Bellman optimality (\(Q^{*}\))</b></td><td>\(Q^{*}(s,a) = \sum_{s',r} p(s',r \mid s,a)[r + \gamma \max_{a'} Q^{*}(s',a')]\)</td><td>Non-linear identity governing maximum achievable action values.</td></tr>
+</table></div>
+</section>
+
+<section class="byte extra" id="mental">
+<h2><span class="num">·</span><span class="tt">Consolidated mental model</span> <span class="badge-sup">supplement</span></h2>
+<ol>
+<li><b>The world</b> (Bytes 0–2): a Markov state plus the dynamics \(p(s', r \mid s,a)\) describe everything the environment can do; summing out pieces gives \(P(s' \mid s,a)\) and \(R(s,a)\).</li>
+<li><b>The agent</b> (Bytes 3–5): a policy \(\pi\) chooses actions; the return \(G_t\) scores a run; \(V^{\pi}\) and \(Q^{\pi}\) are the average scores.</li>
+<li><b>Consistency</b> (Bytes 6–8): because \(G_t = R_{t+1} + \gamma G_{t+1}\) and the state is Markov, every value equals "reward now + \(\gamma\) × value next", averaged. For a fixed \(\pi\) this is a linear system you can solve.</li>
+<li><b>Optimality</b> (Byte 9): replace "average over \(\pi\)'s actions" by "max over actions" and you get the equations for the best possible values. The max makes them non-linear — which is why Lecture 2 needs iterative algorithms.</li>
+</ol>
+</section>
+
+<section class="byte extra qa" id="review">
+<h2><span class="num">·</span><span class="tt">Part 1 review questions</span> <span class="badge-sup">supplement</span></h2>
+<ol>
+<li>State the Markov property in words. Give one change to the drone story that would make "battery level" alone non-Markov.</li>
+<li>For the drone, write \(p(s', r \mid \text{Critical}, \text{Recharge})\) for every \((s', r)\) with non-zero probability, and check that it sums to 1.</li>
+<li>With \(\gamma = 0.5\), compute \(G_0\) for the reward sequence \(4, 0, 8\) (then the episode ends), both directly and with \(G_t = R_{t+1} + \gamma G_{t+1}\).</li>
+<li>Which steps of the derivation in Byte 6 use the law of total expectation, and which step uses the Markov property?</li>
+<li>Using \(V^{\pi^*}\) from Byte 8, compute \(Q^{\pi^*}(\text{High}, \text{Recharge})\). Is switching to Recharge in High for one step a good idea?</li>
+<li>Why can \(v^{\pi} = (I - \gamma P^{\pi})^{-1} r^{\pi}\) not be used directly to find \(V^*\)?</li>
+</ol>
+<details><summary>Answers</summary>
+<ol>
+<li>The next state and reward depend only on the current state and action, not on earlier history. Example: if the battery drains faster after many flights, the flight count matters too, so it must be added to the state.</li>
+<li>\(p(\text{High}, -2 \mid \text{Crit}, \text{Rech}) = 0.5\) and \(p(\text{Low}, -2 \mid \text{Crit}, \text{Rech}) = 0.5\); sum \(= 1\).</li>
+<li>Directly: \(4 + 0.5 \cdot 0 + 0.25 \cdot 8 = 6\). Recursively: \(G_2 = 8\), \(G_1 = 0 + 0.5 \cdot 8 = 4\), \(G_0 = 4 + 0.5 \cdot 4 = 6\).</li>
+<li>Steps B (split by action) and C (split by next state and reward) use the law of total expectation; Step E uses the Markov property. Step D uses linearity.</li>
+<li>\(Q^{\pi^*}(\text{High}, \text{Rech}) = 0 + 0.8(1.0 \cdot 30) = 24 &lt; 30 = V^{\pi^*}(\text{High})\). No: recharging when already full wastes a step of delivery income.</li>
+<li>That formula needs a fixed policy to build \(P^{\pi}\) and \(r^{\pi}\). For \(V^*\) the policy is unknown and is chosen by a max inside the equation, which is not linear.</li>
+</ol>
+</details>
+</section>
+
+<footer>
+Deep Reinforcement Learning · Lecture 1: Markov decision processes and Bellman equations (Bytes 0–9). Continue with <a href="../dynamic-programming/">Lecture 2: Dynamic Programming</a>.
+Numbers in the supplement boxes are computed by code from the equations shown. Mathematics is typeset with KaTeX.
+</footer>
+
+</div></main>
+<script>
+const tip=document.getElementById("tip");
+document.addEventListener("mousemove",e=>{const t=e.target.closest&&e.target.closest("[data-tip]"); if(t){tip.innerHTML=t.getAttribute("data-tip");tip.style.opacity=1;tip.style.left=Math.min(e.clientX+14,innerWidth-270)+"px";tip.style.top=(e.clientY+14)+"px";}else tip.style.opacity=0;});
+function buildTOC(){
+  const list=document.getElementById("toclist");let h="",open=false,gi=0;
+  document.querySelectorAll(".wrap > .part, .wrap section.byte").forEach(n=>{
+    if(n.classList.contains("part")){if(open)h+=`</div></div>`;
+      h+=`<div class="pgroup" data-g="${gi++}"><button type="button" class="ptitle" aria-expanded="true"><span class="chev">▾</span>${n.dataset.short}</button><div class="pitems">`;open=true;return;}
+    const num=n.querySelector("h2 .num"),title=n.querySelector("h2 .tt").textContent;
+    h+=`<a href="#${n.id}" class="${n.classList.contains("extra")?"extra":""}"><span class="n">${num?num.textContent:""}</span><span>${title}</span></a>`;});
+  if(open)h+=`</div></div>`;
+  list.innerHTML=h;
+  const links=[...list.querySelectorAll("a")],groups=[...list.querySelectorAll(".pgroup")];
+  const KEY="toc-collapsed:"+location.pathname;let saved=[];
+  try{saved=JSON.parse(localStorage.getItem(KEY)||"[]");}catch(e){}
+  const setG=(g,c)=>{g.classList.toggle("closed",c);g.querySelector(".ptitle").setAttribute("aria-expanded",String(!c));};
+  const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(groups.filter(g=>g.classList.contains("closed")).map(g=>g.dataset.g)));}catch(e){}};
+  groups.forEach(g=>setG(g,saved.includes(g.dataset.g)));
+  list.onclick=e=>{const t=e.target.closest(".ptitle");
+    if(t){const g=t.parentNode;setG(g,!g.classList.contains("closed"));save();return;}
+    if(e.target.closest("a"))document.body.classList.remove("menu-open");};
+  document.getElementById("tocq").oninput=e=>{const q=e.target.value.toLowerCase();links.forEach(a=>a.style.display=a.textContent.toLowerCase().includes(q)?"":"none");
+    list.classList.toggle("filtering",!!q);
+    groups.forEach(g=>g.style.display=!q||[...g.querySelectorAll("a")].some(a=>a.style.display!=="none")?"":"none");};
+  const secs=links.map(a=>document.querySelector(a.getAttribute("href")));
+  const bar=document.querySelector("#progress div");
+  const spy=()=>{let cur=0;secs.forEach((s,i)=>{if(s.getBoundingClientRect().top<120)cur=i;});links.forEach((a,i)=>a.classList.toggle("on",i===cur));groups.forEach(g=>g.classList.toggle("has-on",!!g.querySelector("a.on")));
+    const d=document.documentElement;bar.style.width=(100*d.scrollTop/(d.scrollHeight-d.clientHeight))+"%";};
+  addEventListener("scroll",spy,{passive:true});spy();
+  let lastOn=null;setInterval(()=>{const a=list.querySelector("a.on");if(a&&a!==lastOn){lastOn=a;const r=a.getBoundingClientRect(),tr=document.getElementById("toc").getBoundingClientRect();if(r.top<tr.top+40||r.bottom>tr.bottom-20)a.scrollIntoView({block:"center"});}},400);
+
+}
+
+function init(){
+  buildTOC();
+  if(window.renderMathInElement) renderMathInElement(document.body,{delimiters:[{left:"$$",right:"$$",display:true},{left:"\\(",right:"\\)",display:false}],ignoredClasses:["mono"],throwOnError:false});
+}
+window.addEventListener("load",init);
+</script>
+</body>
+</html>
