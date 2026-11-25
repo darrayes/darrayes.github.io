@@ -859,11 +859,6 @@
 </style>
 </head>
 <body>
-<div style="background:#1f2328;color:#d0d7de;font:12.5px/1 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:8px 20px;display:flex;gap:16px;flex-wrap:wrap">
-<a href="../" style="color:#fff;text-decoration:none">&larr; Deep Reinforcement Learning</a>
-<a href="../dynamic-programming/" style="color:#9ecbff;text-decoration:none">Lecture notes: Dynamic Programming</a>
-<a href="../mdp-bellman/" style="color:#9ecbff;text-decoration:none">Lecture notes: MDPs &amp; Bellman</a>
-</div>
 
 <!-- ========================================================================
      TOP CONTROL BAR
@@ -3850,10 +3845,6 @@
   // Boot Application
   wireEvents();
   loadPreset('drone');
-  // deep links from the lecture notes: #tab1 ... #tab5
-  const openHash = () => { const b = document.querySelector('[data-tab="' + location.hash.slice(1) + '"]'); if (b) b.click(); };
-  openHash(); window.addEventListener('hashchange', openHash);
-  document.querySelectorAll('#tabButtons .tab-btn').forEach(b => b.addEventListener('click', () => history.replaceState(null, '', '#' + b.dataset.tab)));
 })();
 </script>
 </body>
