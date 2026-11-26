@@ -101,3 +101,47 @@ function init(){
   tocChrome();
 }
 addEventListener("DOMContentLoaded",init);
+
+/* ---------- cross-reference previews: hover (or focus) a §-link to see what it points to ----------
+   Internal links show the target section's title and first paragraph (or a figure's caption);
+   links into the Transformers notes (data-xo) use the titles the build embedded in #oldsecs.
+   Clicking an internal link leaves a "back" pill that returns to where you were reading. */
+function xrefPreviews(){
+  const card=document.createElement("div"); card.id="xprev"; card.setAttribute("role","tooltip"); document.body.appendChild(card);
+  let OLDS={}; try{OLDS=JSON.parse(document.getElementById("oldsecs").textContent);}catch(e){}
+  let timer=null, cur=null;
+  function content(a){
+    if(a.dataset.xo){const o=OLDS[a.dataset.xo]; if(!o) return null;
+      return `<div class="xk">${a.textContent} · Transformers notes</div><div class="xt">${o.t}</div><div class="xp">${o.p}</div><div class="xh">Opens the earlier notes</div>`;}
+    const t=document.getElementById(a.getAttribute("href").slice(1)); if(!t) return null;
+    if(t.tagName==="FIGURE"){const fc=t.querySelector("figcaption"); if(!fc) return null;
+      const c=fc.cloneNode(true); c.querySelectorAll(".chip").forEach(x=>x.remove());
+      const b=c.querySelector("b"), title=b?b.innerHTML.replace(/^Figure [\d.]+ —\s*/,""):""; if(b) b.remove();
+      return `<div class="xk">${a.textContent} · in ${t.closest("section")?"§"+(t.closest("section").querySelector(".num")||{}).textContent:"this page"}</div><div class="xt">${title}</div><div class="xp">${c.innerHTML}</div>`;}
+    const h=t.querySelector("h2 .tt")||t.querySelector("h2"), p=t.querySelector(":scope > p");
+    return `<div class="xk">${a.textContent} · this page</div><div class="xt">${h?h.innerHTML:""}</div>${p?`<div class="xp">${p.innerHTML}</div>`:""}`;
+  }
+  function show(a){const html=content(a); if(!html) return; cur=a; card.innerHTML=html; card.classList.add("on");
+    const r=a.getBoundingClientRect(), w=Math.min(380,innerWidth-24); card.style.width=w+"px";
+    const left=Math.max(12,Math.min(r.left,innerWidth-w-12)); card.style.left=left+"px";
+    const below=r.bottom+8, h=card.offsetHeight; card.style.top=(below+h>innerHeight-8&&r.top-h-8>8?r.top-h-8:below)+"px";}
+  function hide(){clearTimeout(timer); card.classList.remove("on"); cur=null;}
+  document.addEventListener("mouseover",e=>{const a=e.target.closest&&e.target.closest("a.xref"); if(!a||a===cur) return;
+    clearTimeout(timer); timer=setTimeout(()=>show(a),180);});
+  document.addEventListener("mouseout",e=>{const a=e.target.closest&&e.target.closest("a.xref"); if(!a) return;
+    if(e.relatedTarget&&(a.contains(e.relatedTarget)||card.contains(e.relatedTarget))) return; clearTimeout(timer); timer=setTimeout(hide,120);});
+  card.addEventListener("mouseleave",()=>{timer=setTimeout(hide,120);});
+  card.addEventListener("mouseenter",()=>clearTimeout(timer));
+  document.addEventListener("focusin",e=>{const a=e.target.closest&&e.target.closest("a.xref"); if(a) show(a);});
+  document.addEventListener("focusout",e=>{if(e.target.closest&&e.target.closest("a.xref")) hide();});
+  addEventListener("scroll",()=>{if(cur) hide();},{passive:true});
+  // back pill
+  const pill=document.createElement("button"); pill.id="xback"; pill.type="button"; document.body.appendChild(pill);
+  let backY=null, pillT=null;
+  document.addEventListener("click",e=>{const a=e.target.closest&&e.target.closest("a.xref"); if(!a||a.dataset.xo) return;
+    const s=a.closest("section"), num=s&&s.querySelector("h2 .num"), tt=s&&s.querySelector("h2 .tt");
+    backY=scrollY; pill.textContent="↩ Back to "+(num&&num.textContent!=="·"?"§"+num.textContent+" ":"")+(tt?tt.textContent:"where you were");
+    pill.classList.add("on"); hide(); clearTimeout(pillT); pillT=setTimeout(()=>pill.classList.remove("on"),20000);});
+  pill.onclick=()=>{if(backY!==null) scrollTo({top:backY,behavior:"smooth"}); pill.classList.remove("on");};
+}
+addEventListener("DOMContentLoaded",xrefPreviews);
