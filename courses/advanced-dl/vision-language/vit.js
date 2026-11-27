@@ -125,4 +125,27 @@
     el.querySelector(".rs").onclick = () => { perm = [0, 1, 2, 3]; draw(); };
     pe.onchange = draw; draw();
   };
+  /* ---------- §100: one attention head, seen from the [CLS] query ---------- */
+  FIG.clsAttn = el => {
+    const J = JSON.parse(el.dataset.j), X = J.Xc, WV = J.cls_W.WV, q0 = J.cls_W.WQ.map((r, i) => r[i]);
+    const feats = ["brightness", "left − right", "top − bottom"], toks = ["[CLS]", "patch 1 · flat", "patch 2 · vertical edge", "patch 3 · horizontal edge", "patch 4 · mixed"];
+    el.innerHTML = `<div class="ctrl"><span>[CLS] query weights (diagonal of W<sub>Q</sub>):</span></div>
+      <div class="ctrl sl">${feats.map((f, i) => `<label>${f} <input type="range" min="-1" max="1" step="0.1" value="${q0[i]}"><output></output></label>`).join("")}<button type="button" class="rs">reset</button></div>
+      <div class="panel"><div class="tab"></div><div class="readout"></div></div>`;
+    const sl = [...el.querySelectorAll(".sl input")], tab = el.querySelector(".tab"), ro = el.querySelector(".readout");
+    function draw() {
+      const w = sl.map(x => +x.value); sl.forEach((x, i) => x.nextElementSibling.textContent = fmt(w[i], 1));
+      const q = X[0].map((v, i) => v * w[i]);                       // x_cls · diag(w)
+      const sc = X.map(k => k.reduce((a, v, i) => a + v * q[i], 0) / Math.sqrt(3));   // W_K = I
+      const a = softmax(sc), V = X.map(r => r.map((v, i) => v * WV[i][i]));
+      const o = [0, 1, 2].map(j => V.reduce((s, r, t) => s + a[t] * r[j], 0));
+      let t = `<table class="pm"><tr><th>token</th><th>score</th><th>weight</th><th style="min-width:130px"></th></tr>`;
+      toks.forEach((n, i) => { t += `<tr><th style="text-align:left">${n}</th><td>${fmt(sc[i], 3)}</td><td>${fmt(a[i], 3)}</td><td style="text-align:left"><span style="display:inline-block;height:10px;border-radius:2px;background:${i ? C.q : C.dec};width:${Math.round(120 * a[i])}px"></span></td></tr>`; });
+      tab.innerHTML = t + "</table>";
+      ro.innerHTML = `<b>q = [${q.map(v => fmt(v, 2)).join(", ")}]</b><br>scores = q·k / √3, weights = softmax(scores)<br><b>new [CLS] = Σ weight · v = [${o.map(v => fmt(v, 4)).join(", ")}]</b><br><span style="color:var(--muted)">Raise “brightness” and the bright patches win;<br>set all three to 0 and the weights become equal (1/5 each).</span>`;
+    }
+    sl.forEach(x => x.oninput = draw);
+    el.querySelector(".rs").onclick = () => { sl.forEach((x, i) => x.value = q0[i]); draw(); };
+    draw();
+  };
 })();
