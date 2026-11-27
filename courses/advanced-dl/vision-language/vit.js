@@ -330,4 +330,48 @@
     }
     n.onchange = k.onchange = t.oninput = draw; draw();
   };
+  /* ---------- §121: the token budget of one image ---------- */
+  FIG.tokenBudget = el => {
+    el.innerHTML = `<div class="ctrl"><label>image side <input type="range" class="sd" min="224" max="1344" step="112" value="336"><output></output> px</label></div>
+      <div class="ctrl"><label><input type="checkbox" class="tl"> tiling (tiles of 336 px + 1 overview)</label><label><input type="checkbox" class="mg"> 2×2 token merge</label>
+      <label><input type="checkbox" class="lq"> learned queries (64)</label></div><div class="panel"><div class="viz"></div><div class="readout"></div></div>`;
+    const sd = el.querySelector(".sd"), tl = el.querySelector(".tl"), mg = el.querySelector(".mg"), lq = el.querySelector(".lq"), viz = el.querySelector(".viz"), ro = el.querySelector(".readout");
+    const c = x => Math.round(x).toLocaleString("en-US"), kv = 0.5;
+    function draw() {
+      const side = +sd.value; sd.nextElementSibling.textContent = side;
+      let tiles = 1, per = (side / 14) ** 2, how = `(${side}/14)² = ${c(per)}`;
+      if (tl.checked) { const n = Math.ceil(side / 336); tiles = n * n + 1; per = 576; how = `${n}×${n} tiles + 1 overview = ${tiles} views × 576`; }
+      let N = tiles * per; const raw = N;
+      if (mg.checked) N = N / 4;
+      if (lq.checked) N = 64 * (tl.checked ? tiles : 1);
+      const W = 220, gN = tl.checked ? Math.ceil(side / 336) : 1; let s = `<rect width="${W}" height="${W}" fill="${C.soft}" stroke="${C.ink2}"/>`;
+      for (let i = 1; i < gN; i++) { const p = W * i / gN; s += `<line x1="${p}" x2="${p}" y1="0" y2="${W}" stroke="${C.k}" stroke-width="2"/><line y1="${p}" y2="${p}" x1="0" x2="${W}" stroke="${C.k}" stroke-width="2"/>`; }
+      const fine = Math.min(48, side / 14) / gN; if (!tl.checked && side / 14 <= 48) for (let i = 1; i < side / 14; i++) { const p = W * i / (side / 14); s += `<line x1="${p}" x2="${p}" y1="0" y2="${W}" stroke="${C.q}" stroke-width=".4"/><line y1="${p}" y2="${p}" x1="0" x2="${W}" stroke="${C.q}" stroke-width=".4"/>`; }
+      viz.innerHTML = svg(W + 2, W + 22, `<g transform="translate(1,1)">${s}</g><text x="${W / 2}" y="${W + 18}" text-anchor="middle" style="font-size:11px;fill:${C.mut}">${side}×${side} image${tl.checked ? ", orange = tiles" : ""}</text>`);
+      ro.innerHTML = `${how}${tl.checked ? " = " + c(raw) : ""} patch outputs<br>${mg.checked && !lq.checked ? `2×2 merge: ÷4 → ${c(N)}<br>` : ""}${lq.checked ? `learned queries: 64 per view → ${c(N)}<br>` : ""}
+        <b>visual tokens in the LLM: ${c(N)}</b><br>KV cache for the image: <b>${c(N * kv)} MiB</b> (0.5 MiB per token)<br>
+        LLM scores per head per layer with a 20-token question: ${c((N + 20) * (N + 21) / 2)}<br>
+        <span style="color:var(--muted)">Illustrative 7B LLM: 32 layers, D = 4096, 16-bit, no GQA.</span>`;
+    }
+    [sd, tl, mg, lq].forEach(x => x.oninput = x.onchange = draw); draw();
+  };
+
+  /* ---------- §122: the three connectors on one image and one question ---------- */
+  FIG.connCompare = el => {
+    el.innerHTML = `<div class="ctrl"><label>patch outputs N <select class="n">${[256, 576, 1024, 2880].map(v => `<option ${v === 576 ? "selected" : ""}>${v}</option>`).join("")}</select></label>
+      <label>question T <input type="range" class="t" min="10" max="500" step="10" value="20"><output></output></label>
+      <label>N<sub>q</sub> <select class="k">${[32, 64, 128].map(v => `<option ${v === 64 ? "selected" : ""}>${v}</option>`).join("")}</select></label>
+      <label>cross-attention layers <select class="x">${[4, 8, 16].map(v => `<option ${v === 8 ? "selected" : ""}>${v}</option>`).join("")}</select></label></div>
+      <div class="tab"></div>`;
+    const n = el.querySelector(".n"), t = el.querySelector(".t"), k = el.querySelector(".k"), x = el.querySelector(".x"), tab = el.querySelector(".tab");
+    const c = v => Math.round(v).toLocaleString("en-US"), kv = 0.5, D = 4096;
+    function draw() {
+      const N = +n.value, T = +t.value, K = +k.value, XL = +x.value; t.nextElementSibling.textContent = T;
+      const rows = [["Prefix", N + T, (N + T) * kv], ["Learned queries as prefix", K + T, (K + T) * kv], ["Cross-attention (on resampled tokens)", T, T * kv + XL * K * 2 * D * 2 / 2 ** 20]];
+      const mx = Math.max(...rows.map(r => r[2]));
+      tab.innerHTML = `<table class="pm" style="margin:auto"><tr><th>design</th><th>LLM sequence</th><th>KV cache</th><th style="min-width:150px"></th></tr>` +
+        rows.map(r => `<tr><th style="text-align:left">${r[0]}</th><td>${c(r[1])}</td><td>${fmt(r[2], 1)} MiB</td><td style="text-align:left"><span style="display:inline-block;height:9px;border-radius:2px;background:${C.dec};width:${Math.max(1, Math.round(150 * r[2] / mx))}px"></span></td></tr>`).join("") + `</table>`;
+    }
+    [n, t, k, x].forEach(e => e.oninput = e.onchange = draw); draw();
+  };
 })();
