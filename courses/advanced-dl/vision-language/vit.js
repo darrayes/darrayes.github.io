@@ -1,7 +1,7 @@
 /* Vision Transformer demos (§95–§98): token cost, patchify, patch embedding, positions.
    Example numbers arrive from data.json through data-j attributes, so they match the text. */
 (function () {
-  const gray = v => { const t = Math.round(255 * (1 - v / 9)); return `rgb(${t},${t},${t})`; };   // 0 = white … 9 = black
+  const gray = v => { const t = Math.round(255 * v / 9); return `rgb(${t},${t},${t})`; };   // 0 = black … 9 = white (as in §94)
   const PCOL = ["#2a78d6", "#eb6834", "#1baf7a", "#6250d6"];
   const pcol = (n, N) => N <= 4 ? PCOL[n] : `hsl(${Math.round(360 * n / N)},62%,48%)`;
   const comma = n => Math.round(n).toLocaleString("en-US");
@@ -48,11 +48,11 @@
       const ps = patches(), N = ps.length, cs = 46; sel = Math.min(sel, N - 1);
       let s = "";
       for (let u = 0; u < n; u++) for (let w = 0; w < n; w++) { const v = I[u][w];
-        s += `<rect x="${w * cs}" y="${u * cs}" width="${cs}" height="${cs}" fill="${gray(v)}" stroke="#ddd"/><text x="${w * cs + cs / 2}" y="${u * cs + cs / 2 + 5}" text-anchor="middle" style="font-size:15px;fill:${v > 4 ? "#fff" : C.ink}">${v}</text>`; }
+        s += `<rect x="${w * cs}" y="${u * cs}" width="${cs}" height="${cs}" fill="${gray(v)}" stroke="#ddd"/><text x="${w * cs + cs / 2}" y="${u * cs + cs / 2 + 5}" text-anchor="middle" style="font-size:15px;fill:${v < 5 ? "#fff" : C.ink}">${v}</text>`; }
       ps.forEach((p, k) => { s += `<rect class="pt" data-k="${k}" x="${p.b * cs + 2}" y="${p.a * cs + 2}" width="${P * cs - 4}" height="${P * cs - 4}" fill="${k === sel ? pcol(k, N) : "transparent"}" fill-opacity=".18" stroke="${pcol(k, N)}" stroke-width="${k === sel ? 4 : 2}" rx="3" style="cursor:pointer"/>`; });
       viz.innerHTML = svg(n * cs + 2, n * cs + 2, `<g transform="translate(1,1)">${s}</g>`);
       let t = `<div class="mt" style="font:600 12px sans-serif;color:var(--ink2);margin-bottom:4px">patch matrix X<sub>p</sub> · ${N} × ${P * P}</div><table class="pm">`;
-      ps.forEach((p, k) => { t += `<tr data-k="${k}" class="${k === sel ? "on" : ""}" style="cursor:pointer"><th style="color:${pcol(k, N)}">patch ${k + 1}</th>${p.v.map(x => `<td style="background:${gray(x)};color:${x > 4 ? "#fff" : C.ink}">${x}</td>`).join("")}</tr>`; });
+      ps.forEach((p, k) => { t += `<tr data-k="${k}" class="${k === sel ? "on" : ""}" style="cursor:pointer"><th style="color:${pcol(k, N)}">patch ${k + 1}</th>${p.v.map(x => `<td style="background:${gray(x)};color:${x < 5 ? "#fff" : C.ink}">${x}</td>`).join("")}</tr>`; });
       rows.innerHTML = t + "</table>";
       const p = ps[sel];
       ro.innerHTML = `<b>P = ${P}</b>: N = (4/${P})·(4/${P}) = <b>${N}</b> token${N > 1 ? "s" : ""}, each with P²C = ${P}·${P}·1 = <b>${P * P}</b> number${P > 1 ? "s" : ""}. ${N} × ${P * P} = 16 = all pixels, none lost.<br>
@@ -78,7 +78,7 @@
       sl.forEach((s, i) => { x[i] = +s.value; s.nextElementSibling.textContent = x[i]; });
       const z = [0, 1, 2].map(j => x.reduce((a, xi, i) => a + xi * W[i][j], 0));
       const cs = 54; let s = "";
-      x.forEach((v, i) => { const r_ = i >> 1, c_ = i & 1; s += `<rect x="${c_ * cs}" y="${r_ * cs}" width="${cs}" height="${cs}" fill="${gray(v)}" stroke="#ccc"/><text x="${c_ * cs + cs / 2}" y="${r_ * cs + cs / 2 + 5}" text-anchor="middle" style="font-size:15px;fill:${v > 4 ? "#fff" : C.ink}">${v}</text>`; });
+      x.forEach((v, i) => { const r_ = i >> 1, c_ = i & 1; s += `<rect x="${c_ * cs}" y="${r_ * cs}" width="${cs}" height="${cs}" fill="${gray(v)}" stroke="#ccc"/><text x="${c_ * cs + cs / 2}" y="${r_ * cs + cs / 2 + 5}" text-anchor="middle" style="font-size:15px;fill:${v < 5 ? "#fff" : C.ink}">${v}</text>`; });
       // bars for z
       const bx = 130, mx = 9;
       z.forEach((v, j) => { const y = 6 + j * 30, w = Math.abs(v) / mx * 70;
@@ -146,6 +146,57 @@
     }
     sl.forEach(x => x.oninput = draw);
     el.querySelector(".rs").onclick = () => { sl.forEach((x, i) => x.value = q0[i]); draw(); };
+    draw();
+  };
+  /* ---------- Part V walkthrough: the whole tiny ViT, recomputed live ---------- */
+  FIG.tinyVit = el => {
+    const W = JSON.parse(el.dataset.j).w_all;
+    const erf = x => { const s = Math.sign(x); x = Math.abs(x); const t = 1 / (1 + 0.3275911 * x);   // A&S 7.1.26, |error| < 1.5e-7
+      return s * (1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x)); };
+    const gelu = x => 0.5 * x * (1 + erf(x / Math.SQRT2));
+    const mm = (A, B) => A.map(r => B[0].map((_, j) => r.reduce((s, v, k) => s + v * B[k][j], 0)));
+    const ln = r => { const m = r.reduce((a, b) => a + b, 0) / r.length, v = r.reduce((a, b) => a + (b - m) ** 2, 0) / r.length; return r.map(x => (x - m) / Math.sqrt(v + 1e-5)); };
+    const cols = (A, a, b) => A.map(r => r.slice(a, b)), T = A => A[0].map((_, j) => A.map(r => r[j]));
+    let img = W.img.map(r => r.slice()), order = [0, 1, 2, 3];
+    el.innerHTML = `<div class="ctrl"><label><input type="checkbox" class="pe" checked> position embeddings</label>
+      <button type="button" class="sh">swap patch slots 1↔2 and 3↔4</button><button type="button" class="rs">reset</button></div>
+      <div class="panel"><div class="viz"></div><div class="out"></div></div><div class="readout" style="margin-top:8px"></div>`;
+    const viz = el.querySelector(".viz"), out = el.querySelector(".out"), ro = el.querySelector(".readout"), pe = el.querySelector(".pe");
+    function forward() {
+      const Xp = []; for (const a of [0, 4]) for (const b of [0, 4]) { const v = []; for (let u = a; u < a + 4; u++) for (let w = b; w < b + 4; w++) v.push(img[u][w] / 9); Xp.push(v); }
+      const Z = mm(Xp, W.Wp), Zo = order.map(k => Z[k]);
+      const X = [W.cls, ...Zo].map((r, i) => r.map((v, j) => v + (pe.checked ? W.Epos[i][j] : 0)));
+      const Xn = X.map(ln), Q = mm(Xn, W.WQ), K = mm(Xn, W.WK), V = mm(Xn, W.WV);
+      const A = [0, 1].map(h => mm(cols(Q, 2 * h, 2 * h + 2), T(cols(K, 2 * h, 2 * h + 2))).map(r => softmax(r.map(x => x / Math.SQRT2))));
+      const O = [0, 1].map(h => mm(A[h], cols(V, 2 * h, 2 * h + 2)));
+      const Oc = O[0].map((r, i) => [...r, ...O[1][i]]), X1 = mm(Oc, W.WO).map((r, i) => r.map((v, j) => v + X[i][j]));
+      const Hh = mm(X1.map(ln), W.W1).map(r => r.map(gelu)), X2 = mm(Hh, W.W2).map((r, i) => r.map((v, j) => v + X1[i][j]));
+      const h = ln(X2[0]), p = softmax(mm([h], W.Wh)[0]);
+      return { Z, A, p, y: X2[0] };
+    }
+    function draw() {
+      const R = forward(), cs = 30; let s = "";
+      for (let u = 0; u < 8; u++) for (let w = 0; w < 8; w++) { const v = img[u][w];
+        s += `<rect data-u="${u}" data-w="${w}" x="${w * cs}" y="${u * cs}" width="${cs}" height="${cs}" fill="${gray(v)}" stroke="#bbb" stroke-width=".5" style="cursor:pointer"/><text x="${w * cs + cs / 2}" y="${u * cs + cs / 2 + 4}" text-anchor="middle" style="font-size:11px;pointer-events:none;fill:${v < 5 ? "#fff" : C.ink}">${v}</text>`; }
+      [0, 1, 2, 3].forEach(k => { const a = (k >> 1) * 4, b = (k & 1) * 4, slot = order.indexOf(k) + 1;
+        s += `<rect x="${b * cs + 1.5}" y="${a * cs + 1.5}" width="${4 * cs - 3}" height="${4 * cs - 3}" fill="none" stroke="${PCOL[k]}" stroke-width="3" rx="3" style="pointer-events:none"/><rect x="${b * cs + 3}" y="${a * cs + 3}" width="104" height="15" rx="3" fill="#fff" opacity=".9" style="pointer-events:none"/><text x="${b * cs + 6}" y="${a * cs + 14}" style="font-size:11px;font-weight:700;fill:${PCOL[k]};pointer-events:none">patch ${k + 1} · slot ${slot}</text>`; });
+      viz.innerHTML = svg(8 * cs + 2, 8 * cs + 2, `<g transform="translate(1,1)">${s}</g>`);
+      const bar = (v, c) => `<span style="display:inline-block;height:9px;border-radius:2px;background:${c};width:${Math.round(90 * v)}px"></span>`;
+      let t = `<table class="pm"><tr><th>token</th><th>head 1</th><th>head 2</th></tr>`;
+      ["[CLS]", ...order.map(k => "patch " + (k + 1))].forEach((n, i) => { t += `<tr><th style="text-align:left">${n}</th><td style="text-align:left">${bar(R.A[0][0][i], C.q)} ${fmt(R.A[0][0][i], 3)}</td><td style="text-align:left">${bar(R.A[1][0][i], C.k)} ${fmt(R.A[1][0][i], 3)}</td></tr>`; });
+      t += `</table><div style="font:600 12px sans-serif;color:var(--ink2);margin:10px 0 4px">class probabilities</div><table class="pm">` +
+        ["A", "B", "C"].map((c, i) => `<tr><th>class ${c}</th><td style="text-align:left">${bar(R.p[i], C.dec)} ${fmt(R.p[i], 4)}</td></tr>`).join("") + `</table>`;
+      out.innerHTML = `<div style="font:600 12px sans-serif;color:var(--ink2);margin-bottom:4px">where [CLS] looks (row 0 of each head)</div>` + t;
+      const same = JSON.stringify(img) === JSON.stringify(W.img) && order.join() === "0,1,2,3" && pe.checked;
+      const match = R.p.every((v, i) => Math.abs(v - W.p[i]) < 1e-6);
+      ro.innerHTML = `patch tokens Z: ${R.Z.map((r, k) => `p${k + 1} [${r.map(v => fmt(v, 3)).join(", ")}]`).join(" · ")}<br>
+        [CLS] output: [${R.y.map(v => fmt(v, 4)).join(", ")}]` +
+        (same ? `<br><b>${match ? "✓ matches the walkthrough exactly" : "✗ does not match the walkthrough"}</b>` : "");
+      viz.querySelectorAll("rect[data-u]").forEach(r => r.onclick = () => { const u = +r.dataset.u, w = +r.dataset.w; img[u][w] = (img[u][w] + 3) % 10; draw(); });
+    }
+    pe.onchange = draw;
+    el.querySelector(".sh").onclick = () => { order = order.join() === "0,1,2,3" ? [1, 0, 3, 2] : [0, 1, 2, 3]; draw(); };
+    el.querySelector(".rs").onclick = () => { img = W.img.map(r => r.slice()); order = [0, 1, 2, 3]; pe.checked = true; draw(); };
     draw();
   };
 })();
