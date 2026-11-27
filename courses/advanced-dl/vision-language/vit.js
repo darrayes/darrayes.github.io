@@ -231,4 +231,34 @@
     el.querySelectorAll("button[data-k]").forEach(b => b.onclick = () => load(pres[b.dataset.k]));
     ang.oninput = len.oninput = fromSliders; load(pres.g4);
   };
+  /* ---------- §116: the shared space, search and zero-shot labels ---------- */
+  FIG.sharedSpace = el => {
+    const J = JSON.parse(el.dataset.j).de_all, names = ["dog", "cat", "car"];
+    const caps = ["a dog running on grass", "a cat on a sofa", "a red car on a road"];
+    el.innerHTML = `<div class="ctrl"><label>direction of the new image f <input type="range" class="ang" min="-180" max="180" step="0.1"><output></output></label>
+      <label>softmax scale <select class="sc"><option>1</option><option selected>10</option><option>100</option></select></label><button type="button" class="rs">reset</button></div>
+      <div class="panel"><div class="viz"></div><div class="readout"></div></div>`;
+    const ang = el.querySelector(".ang"), sc = el.querySelector(".sc"), viz = el.querySelector(".viz"), ro = el.querySelector(".readout");
+    const a0 = Math.atan2(J.f[1], J.f[0]) * 180 / Math.PI; let f = J.f.slice();
+    function draw() {
+      ang.nextElementSibling.textContent = fmt(Math.atan2(f[1], f[0]) * 180 / Math.PI, 1) + "°";
+      const W = 320, c = W / 2, R = 108, P = (v, r = R) => [c + r * v[0], c - r * v[1]];
+      let s = `<rect width="${W}" height="${W}" rx="8" fill="${C.soft}"/><circle cx="${c}" cy="${c}" r="${R}" fill="none" stroke="${C.mut}" stroke-dasharray="3 3"/>`;
+      const dot = (v, col, hollow) => { const [x, y] = P(v); return `<circle cx="${x}" cy="${y}" r="5.5" fill="${hollow ? "#fff" : col}" stroke="${col}" stroke-width="2"/>`; };
+      J.Fh.forEach(v => s += dot(v, C.q)); J.Gh.forEach(v => s += dot(v, C.k)); J.Ph.forEach(v => s += dot(v, C.v, true));
+      names.forEach((n, i) => { const m = [0, 1].map(k => J.Fh[i][k] + J.Gh[i][k] + J.Ph[i][k]), L = Math.hypot(...m), u = m.map(x => x / L), [x, y] = P(u, R + 24);
+        s += `<text x="${x}" y="${y + 4}" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:${C.ink}">${n}</text>`; });
+      const [fx, fy] = P(f), [mx, my] = P(f, R * 0.5);
+      s += `<line x1="${c}" y1="${c}" x2="${fx}" y2="${fy}" stroke="${C.dec}" stroke-width="2.5" marker-end="url(#ahd)"/><text x="${mx}" y="${my + (f[1] >= 0 ? 16 : -8)}" text-anchor="middle" style="font-size:12px;font-weight:700;fill:${C.dec}">f</text>`;
+      s += `<circle cx="14" cy="${W - 40}" r="5" fill="${C.q}"/><text x="24" y="${W - 36}" style="font-size:11px">photo</text><circle cx="72" cy="${W - 40}" r="5" fill="${C.k}"/><text x="82" y="${W - 36}" style="font-size:11px">caption</text><circle cx="140" cy="${W - 40}" r="5" fill="#fff" stroke="${C.v}" stroke-width="2"/><text x="150" y="${W - 36}" style="font-size:11px">prompt</text><text x="14" y="${W - 16}" style="font-size:11px;fill:${C.dec};font-weight:700">→ new image f</text>`;
+      viz.innerHTML = svg(W, W, s);
+      const cs = J.Ph.map(g => g[0] * f[0] + g[1] * f[1]), p = softmax(cs.map(x => x * +sc.value)), best = cs.indexOf(Math.max(...cs));
+      ro.innerHTML = `<b>f = [${f.map(v => fmt(v, 4)).join(", ")}]</b><br>` +
+        names.map((n, i) => `“a photo of a ${n}”: cosine ${fmt(cs[i], 4)} → p = ${fmt(p[i], 4)}`).join("<br>") +
+        `<br><b>zero-shot label: ${names[best]}</b><br><span style="color:var(--muted)">Turn f around the circle.<br>The scale changes the probabilities, never the pick.</span>`;
+    }
+    ang.oninput = () => { const a = +ang.value * Math.PI / 180; f = [Math.cos(a), Math.sin(a)]; draw(); }; sc.onchange = draw;
+    el.querySelector(".rs").onclick = () => { f = J.f.slice(); ang.value = a0; sc.value = "10"; draw(); };
+    ang.value = a0; draw();
+  };
 })();
