@@ -199,4 +199,36 @@
     el.querySelector(".rs").onclick = () => { img = W.img.map(r => r.slice()); order = [0, 1, 2, 3]; pe.checked = true; draw(); };
     draw();
   };
+  /* ---------- §114: dot product vs cosine similarity in the plane ---------- */
+  FIG.cosine = el => {
+    const f = [3, 4], pres = { g1: [6, 8], g2: [4, -3], g3: [1, 1], g4: [30, 0] };
+    el.innerHTML = `<div class="ctrl"><span>load</span>${Object.keys(pres).map(k => `<button type="button" data-k="${k}">${k}</button>`).join("")}</div>
+      <div class="ctrl"><label>direction of g <input type="range" class="ang" min="-180" max="180" step="0.01"><output></output></label>
+      <label>length of g <input type="range" class="len" min="0.5" max="30" step="0.01"><output></output></label></div>
+      <div class="panel"><div class="viz"></div><div class="readout"></div></div>`;
+    const ang = el.querySelector(".ang"), len = el.querySelector(".len"), viz = el.querySelector(".viz"), ro = el.querySelector(".readout");
+    let g = [30, 0];
+    function load(v) { g = v.slice(); ang.value = Math.atan2(g[1], g[0]) * 180 / Math.PI; len.value = Math.hypot(...g); draw(); }
+    function fromSliders() { const a = +ang.value * Math.PI / 180, L = +len.value; g = [L * Math.cos(a), L * Math.sin(a)]; draw(); }
+    function draw() {
+      const L = Math.hypot(...g);
+      ang.nextElementSibling.textContent = fmt(Math.atan2(g[1], g[0]) * 180 / Math.PI, 1) + "°"; len.nextElementSibling.textContent = fmt(L, 2);
+      const dot = f[0] * g[0] + f[1] * g[1], cos = dot / (5 * L), th = Math.acos(Math.max(-1, Math.min(1, cos))) * 180 / Math.PI;
+      const W = 300, c = W / 2, sc = (c - 14) / Math.max(5, L), U = 60;   // the longer vector reaches near the edge; unit circle drawn with radius U px
+      const P = v => [c + v[0] * sc, c - v[1] * sc];
+      let s = `<rect width="${W}" height="${W}" fill="${C.soft}" rx="8"/><line x1="0" x2="${W}" y1="${c}" y2="${c}" stroke="${C.line}"/><line y1="0" y2="${W}" x1="${c}" x2="${c}" stroke="${C.line}"/>`;
+      s += `<circle cx="${c}" cy="${c}" r="${U}" fill="none" stroke="${C.mut}" stroke-dasharray="3 3"/><text x="${c + U * .72 + 4}" y="${c - U * .72 - 4}" style="font-size:10px;fill:${C.mut}">unit circle (scaled)</text>`;
+      const arrow = (v, col, wd, mk) => { const [x, y] = P(v); return `<line x1="${c}" y1="${c}" x2="${x}" y2="${y}" stroke="${col}" stroke-width="${wd}" marker-end="url(#${mk})"/>`; };
+      const unit = (v, col) => { const n = Math.hypot(...v); return `<circle cx="${c + U * v[0] / n}" cy="${c - U * v[1] / n}" r="4.5" fill="${col}"/>`; };
+      s += arrow(f, C.q, 2.2, "ahq") + arrow(g, C.k, 2.2, "ahk") + unit(f, C.q) + unit(g, C.k);
+      const [fx, fy] = P(f), [gx, gy] = P(g);
+      s += `<text x="${fx + 6}" y="${fy - 4}" style="font-size:13px;font-weight:700;fill:${C.q}">f</text><text x="${gx + 6}" y="${gy - 4}" style="font-size:13px;font-weight:700;fill:${C.k}">g</text>`;
+      viz.innerHTML = svg(W, W, s);
+      ro.innerHTML = `f = [3, 4], ‖f‖ = 5<br>g = [${fmt(g[0], 2)}, ${fmt(g[1], 2)}], ‖g‖ = ${fmt(L, 2)}<br>
+        <b>dot f·g = ${fmt(dot, 2)}</b><br><b>cosine = ${fmt(cos, 4)}</b> (angle ${fmt(th, 1)}°)<br>
+        <span style="color:var(--muted)">Drag the length: the dot product grows with it,<br>the cosine does not change.<br>The dots on the circle are the unit vectors f̂ and ĝ;<br>their dot product is the cosine.</span>`;
+    }
+    el.querySelectorAll("button[data-k]").forEach(b => b.onclick = () => load(pres[b.dataset.k]));
+    ang.oninput = len.oninput = fromSliders; load(pres.g4);
+  };
 })();
