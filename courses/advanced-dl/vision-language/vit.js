@@ -261,4 +261,35 @@
     el.querySelector(".rs").onclick = () => { f = J.f.slice(); ang.value = a0; sc.value = "10"; draw(); };
     ang.value = a0; draw();
   };
+  /* ---------- §118: the LLM's input sequence and its causal mask ---------- */
+  FIG.prefixMask = el => {
+    const txt = ["How", "many", "dogs", "?"];
+    el.innerHTML = `<div class="ctrl"><label>visual tokens drawn N<sub>v</sub> <input type="range" class="nv" min="1" max="8" step="1" value="4"><output></output></label>
+      <label>real image size <select class="real"><option value="64">64 visual tokens</option><option value="576" selected>576 (LLaVA-1.5)</option><option value="2880">2,880 (5 tiles × 576)</option></select></label></div>
+      <div class="panel"><div class="viz"></div><div class="readout"></div></div>`;
+    const nv = el.querySelector(".nv"), real = el.querySelector(".real"), viz = el.querySelector(".viz"), ro = el.querySelector(".readout");
+    let sel = null;
+    function draw() {
+      const n = +nv.value; nv.nextElementSibling.textContent = n;
+      const labs = [...Array(n)].map((_, i) => "v" + (i + 1)).concat(txt), L = labs.length; if (sel === null || sel >= L) sel = L - 1;
+      const cs = Math.min(30, Math.floor(300 / L)), off = 46; let s = "";
+      labs.forEach((l, i) => { const vis = i < n, col = vis ? C.ffn : C.q;
+        s += `<text x="${off + i * cs + cs / 2}" y="${off - 6}" text-anchor="middle" style="font-size:10px;fill:${col}">${l}</text>`;
+        s += `<text x="${off - 4}" y="${off + i * cs + cs / 2 + 4}" text-anchor="end" style="font-size:10px;fill:${col};font-weight:${i === sel ? 700 : 400}">${l}</text>`;
+        labs.forEach((_, j) => { const ok = j <= i, onRow = i === sel;
+          const fill = !ok ? "url(#hatch)" : (j < n ? (onRow ? C.ffn : "#f6e7c4") : (onRow ? C.q : C.q + "33"));
+          s += `<rect data-r="${i}" x="${off + j * cs}" y="${off + i * cs}" width="${cs - 1}" height="${cs - 1}" fill="${fill}" style="cursor:pointer"/>`; }); });
+      viz.innerHTML = svg(off + L * cs + 4, off + L * cs + 4, s);
+      viz.querySelectorAll("rect[data-r]").forEach(r => r.onclick = () => { sel = +r.dataset.r; draw(); });
+      const seen = Math.min(sel + 1, n), R = +real.value, Tq = 20, Lr = R + Tq, tot = Lr * (Lr + 1) / 2, img = R * (R + 1) / 2 + Tq * R;
+      ro.innerHTML = `<b>row “${labs[sel]}”</b> sees ${sel + 1} of ${L} tokens, ${seen} of them visual.<br>
+        ${sel >= n ? "Every text row sees <b>all</b> visual tokens: the image comes first." : "A visual row sees only the visual tokens before it."}<br><br>
+        <b>With ${R.toLocaleString("en-US")} visual tokens and a 20-token question:</b><br>
+        input length = ${Lr.toLocaleString("en-US")} tokens<br>
+        allowed (unmasked) scores per head = ${tot.toLocaleString("en-US")}<br>
+        of which involve visual Keys: ${img.toLocaleString("en-US")} (${fmt(100 * img / tot, 1)}%)<br>
+        <span style="color:var(--muted)">Click any row of the grid to select it.</span>`;
+    }
+    nv.oninput = real.onchange = draw; draw();
+  };
 })();
