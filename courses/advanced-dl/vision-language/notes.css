@@ -235,3 +235,5 @@ a.xref{text-decoration-style:dotted;text-underline-offset:3px}
 .demo .ctrl button{font:600 12.5px sans-serif;padding:4px 10px;border-radius:6px;border:1px solid var(--line);background:var(--soft);color:var(--ink);cursor:pointer}
 .demo .ctrl button:hover{border-color:var(--accent)}
 .demo .ctrl.sl input[type=range]{width:110px}
+/* long inline equations: scroll within the line on narrow screens instead of overflowing the column */
+@media (max-width:700px){main p > math, main li > math, main .call > math{display:inline-block;max-width:100%;overflow-x:auto;overflow-y:hidden;vertical-align:middle}}
