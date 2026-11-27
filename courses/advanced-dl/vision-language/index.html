@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vision Transformers and VLMs — Lecture Notes</title>
+<meta name="description" content="Byte-by-byte lecture notes on the architecture of Vision Transformers (images as patch tokens) and vision-language models (dual encoders and encoder–connector–LLM designs), as a direct extension of the Transformer.">
+<link rel="stylesheet" href="notes.css">
+</head>
+<body>
+<button id="menu" onclick="document.body.classList.toggle('menu-open')">☰ Contents</button>
+<div id="progress"><div></div></div>
+<nav id="toc">
+<a class="crumb" href="../" style="font-size:12px;margin:0 0 10px;color:var(--muted)">← Advanced DL</a>
+<a class="crumb" href="../modern-transformers/" style="font-size:12.5px;margin:0 0 12px;background:var(--q-soft);color:var(--ink);font-weight:600">◀ Previous: Modern Transformers, §59–93</a>
+<div class="brand">Vision Transformers &amp; VLMs</div>
+<div class="sub">Images as tokens · §94 onward</div>
+<input id="tocq" type="search" placeholder="Filter sections…" aria-label="Filter sections">
+<div id="toclist"><div class="pgroup"><button class="ptitle" type="button"><span class="chev">▾</span>Front matter</button><div class="pitems"><a href="#how" class=extra><span class="n">·</span><span>How to use these notes</span></a><a href="#notation" class=extra><span class="n">·</span><span>Notation</span></a></div></div><div class="pgroup"><button class="ptitle" type="button"><span class="chev">▾</span>Vision Transformers</button><div class="pitems"><a href="#image"><span class="n">94</span><span>Background: An Image as Numbers</span></a></div></div></div>
+</nav>
+<div class="tip" id="tip"></div>
+
+<!-- shared SVG definitions: arrowheads and the hatch used for masked cells -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#52514e"/></marker>
+<marker id="ahq" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2a78d6"/></marker>
+<marker id="ahk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#eb6834"/></marker>
+<marker id="ahv" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1baf7a"/></marker>
+<marker id="ahd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6250d6"/></marker>
+<pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#f3f2ee"/><line x1="0" y1="0" x2="0" y2="6" stroke="#cfcdc6" stroke-width="2.5"/></pattern>
+</defs>
+</svg>
+
+<main><div class="wrap">
+<header class="hero">
+  <div class="kicker">Lecture notes · Advanced Deep Learning · continues §1–93</div>
+  <h1>Vision Transformers and VLMs</h1>
+  <p class="lede">How the Transformer you already know reads images, and how it is joined to a language model. Architecture only, built one byte at a time.</p>
+</header>
+
+<section class="byte extra" id="how"><h2><span class="num">·</span><span class="tt">How to use these notes</span></h2>
+<p>These notes continue the <a href="../transformers/">Transformers notes</a> (§1–58) and the <a href="../modern-transformers/">Modern Transformers notes</a> (§59–93), and section numbers continue from there. Anything already taught is cited by its section, for example <a class="xref" data-xo="17" href="../transformers/#b17">§17</a> for the embedding table, and is not taught again. Hover a citation to preview it.</p>
+<p>The whole point of these notes is that <b>very little is new</b>. A Vision Transformer is the encoder you already know, fed with a different kind of token. A vision-language model joins that encoder to a language model with parts you have also seen before. Each byte says what problem it solves, shows the equation, explains every symbol, works a small example with numbers, and checks the shapes.</p>
+<p>These notes cover the <b>architecture</b>: what the parts are and how data flows through them. How these models are trained is left for later notes.</p>
+<div class="call key"><b>Learning path</b>
+<ol>
+<li><b>Part V · Vision Transformers</b>: an image as numbers, why pixels can't be tokens, patches, patch embeddings, positions, the [CLS] token, the unchanged encoder block, and the classification head.</li>
+<li><b>Part VI · Vision-language models</b>: matching images and text in one shared space, and generating text about an image by connecting a vision encoder to a language model.</li>
+</ol></div>
+</section>
+
+<section class="byte extra" id="notation"><h2><span class="num">·</span><span class="tt">Notation</span></h2>
+<p>All symbols from the earlier notes keep their meaning: <math alttext="T"><mrow><mi>T</mi></mrow></math> sequence length, <math alttext="D"><mrow><mi>D</mi></mrow></math> model dimension, <math alttext="H"><mrow><mi>H</mi></mrow></math> number of heads, <math alttext="i, j"><mrow><mi>i</mi><mo>,</mo><mi>j</mi></mrow></math> Query and Key positions. The table lists the symbols that are new here.</p>
+<div class="tw"><table class="t">
+<tr><th>Symbol</th><th>Meaning</th><th>First used</th></tr>
+<tr><td><math alttext="H_{im},\ W_{im}"><mrow><msub><mi>H</mi><mrow><mi>i</mi><mi>m</mi></mrow></msub><mo>,</mo><mspace width="0.25em"/><msub><mi>W</mi><mrow><mi>i</mi><mi>m</mi></mrow></msub></mrow></math></td><td>image height and width, in pixels</td><td><a class="xref" href="#image">§94</a></td></tr>
+<tr><td><math alttext="C"><mrow><mi>C</mi></mrow></math></td><td>number of channels (3 for color, 1 for grayscale)</td><td><a class="xref" href="#image">§94</a></td></tr>
+<tr><td><math alttext="u,\ v,\ c"><mrow><mi>u</mi><mo>,</mo><mspace width="0.25em"/><mi>v</mi><mo>,</mo><mspace width="0.25em"/><mi>c</mi></mrow></math></td><td>pixel row, pixel column, channel index</td><td><a class="xref" href="#image">§94</a></td></tr>
+<tr><td><math alttext="x_{u,v,c}"><mrow><msub><mi>x</mi><mrow><mi>u</mi><mo>,</mo><mi>v</mi><mo>,</mo><mi>c</mi></mrow></msub></mrow></math></td><td>one stored value of the image</td><td><a class="xref" href="#image">§94</a></td></tr>
+</table></div>
+<div class="call warn"><b>Why the subscript “im”</b><math alttext="H"><mrow><mi>H</mi></mrow></math> already means the number of attention heads (<a class="xref" data-xo="8" href="../transformers/#b8">§8</a>), so the image height is written <math alttext="H_{im}"><mrow><msub><mi>H</mi><mrow><mi>i</mi><mi>m</mi></mrow></msub></mrow></math>, and its width <math alttext="W_{im}"><mrow><msub><mi>W</mi><mrow><mi>i</mi><mi>m</mi></mrow></msub></mrow></math> to match. Likewise <math alttext="i"><mrow><mi>i</mi></mrow></math> and <math alttext="j"><mrow><mi>j</mi></mrow></math> stay as attention positions, so pixel rows and columns are <math alttext="u"><mrow><mi>u</mi></mrow></math> and <math alttext="v"><mrow><mi>v</mi></mrow></math>.</div>
+</section>
+
+<div class="part" id="part5"><div class="pn">Part V</div><h1>Vision Transformers</h1>
+<p>Turn an image into a sequence of tokens, then reuse the Transformer encoder unchanged.</p></div>
+
+<!-- ============================================================ 94 -->
+<section class="byte" id="image"><h2><span class="num">94</span><span class="tt">Background: An Image as Numbers</span></h2>
+<p>Everything a Transformer has done so far starts from tokens: each word becomes an integer ID, then a row of the embedding table (<a class="xref" data-xo="17" href="../transformers/#b17">§17</a>). To feed it an image we first need to know what an image <i>is</i> to a computer. It is a grid of numbers.</p>
+<p><b>Pixels and channels.</b> A digital image is a grid of small squares called <b>pixels</b>. A color pixel stores three numbers: how much <b>red</b>, <b>green</b> and <b>blue</b> light it has. Each of these is a <b>channel</b>. Every value is a whole number from 0 (none of that color) to 255 (full intensity). So an image is a 3-D array, a <b>tensor</b>:</p>
+<div class="eq"><math display="block" alttext="\mathbf{I} \in \mathbb{R}^{H_{im} \times W_{im} \times C}"><mrow><mi mathvariant="bold">I</mi><mo>∈</mo><msup><mi>ℝ</mi><mrow><msub><mi>H</mi><mrow><mi>i</mi><mi>m</mi></mrow></msub><mo>×</mo><msub><mi>W</mi><mrow><mi>i</mi><mi>m</mi></mrow></msub><mo>×</mo><mi>C</mi></mrow></msup></mrow></math>
+<div class="where"><math alttext="H_{im}"><mrow><msub><mi>H</mi><mrow><mi>i</mi><mi>m</mi></mrow></msub></mrow></math>: image height in pixels (number of rows) · <math alttext="W_{im}"><mrow><msub><mi>W</mi><mrow><mi>i</mi><mi>m</mi></mrow></msub></mrow></math>: image width in pixels (number of columns) · <math alttext="C"><mrow><mi>C</mi></mrow></math>: number of channels, 3 for color (RGB) and 1 for grayscale · <math alttext="x_{u,v,c}"><mrow><msub><mi>x</mi><mrow><mi>u</mi><mo>,</mo><mi>v</mi><mo>,</mo><mi>c</mi></mrow></msub></mrow></math>: one value, at row <math alttext="u"><mrow><mi>u</mi></mrow></math>, column <math alttext="v"><mrow><mi>v</mi></mrow></math>, channel <math alttext="c"><mrow><mi>c</mi></mrow></math>.</div>
+<div class="words"><b>In words</b>An image is <math alttext="H_{im}\cdot W_{im}\cdot C"><mrow><msub><mi>H</mi><mrow><mi>i</mi><mi>m</mi></mrow></msub><mo>⋅</mo><msub><mi>W</mi><mrow><mi>i</mi><mi>m</mi></mrow></msub><mo>⋅</mo><mi>C</mi></mrow></math> numbers arranged in rows, columns and channels.</div></div>
+<p><b>Intuition.</b> Think of three same-sized spreadsheets stacked on top of each other: one for red, one for green, one for blue. A pixel's color is read from the same cell in all three sheets.</p>
+<p><b>Worked example.</b> A tiny 2×2 color image (a teaching choice):</p>
+<div class="tw"><table class="t small">
+<tr><th>Pixel (row <math alttext="u"><mrow><mi>u</mi></mrow></math>, column <math alttext="v"><mrow><mi>v</mi></mrow></math>)</th><th>Looks like</th><th class="num">(R, G, B)</th></tr>
+<tr><td>(1, 1)</td><td><span class="sw" style="background:rgb(255,0,0)"></span> red</td><td class="num">(255, 0, 0)</td></tr>
+<tr><td>(1, 2)</td><td><span class="sw" style="background:rgb(255,255,255)"></span> white</td><td class="num">(255, 255, 255)</td></tr>
+<tr><td>(2, 1)</td><td><span class="sw" style="background:rgb(0,0,0)"></span> black</td><td class="num">(0, 0, 0)</td></tr>
+<tr><td>(2, 2)</td><td><span class="sw" style="background:rgb(51,102,204)"></span> blue-ish</td><td class="num">(51, 102, 204)</td></tr>
+</table></div>
+<p>Stored as a tensor, the same image is three 2×2 sheets, one per channel:</p>
+<div class="mats"><div class="mat" data-m='[[255.0, 255.0], [0.0, 51.0]]' data-t="channel 1 (red)" data-r='["row 1", "row 2"]' data-c='["col 1", "col 2"]' data-kind="plain" data-d="0"></div><div class="mat" data-m='[[0.0, 255.0], [0.0, 102.0]]' data-t="channel 2 (green)" data-r='["row 1", "row 2"]' data-c='["col 1", "col 2"]' data-kind="plain" data-d="0"></div><div class="mat" data-m='[[0.0, 255.0], [0.0, 204.0]]' data-t="channel 3 (blue)" data-r='["row 1", "row 2"]' data-c='["col 1", "col 2"]' data-kind="plain" data-d="0"></div></div>
+<p>Here <math alttext="H_{im}=2"><mrow><msub><mi>H</mi><mrow><mi>i</mi><mi>m</mi></mrow></msub><mo>=</mo><mn>2</mn></mrow></math>, <math alttext="W_{im}=2"><mrow><msub><mi>W</mi><mrow><mi>i</mi><mi>m</mi></mrow></msub><mo>=</mo><mn>2</mn></mrow></math> and <math alttext="C=3"><mrow><mi>C</mi><mo>=</mo><mn>3</mn></mrow></math>, so the image holds <math alttext="2\times2\times3 = 12"><mrow><mn>2</mn><mo>×</mo><mn>2</mn><mo>×</mo><mn>3</mn><mo>=</mo><mn>12</mn></mrow></math> numbers. For example <math alttext="x_{2,2,3} = 204"><mrow><msub><mi>x</mi><mrow><mn>2</mn><mo>,</mo><mn>2</mn><mo>,</mo><mn>3</mn></mrow></msub><mo>=</mo><mn>204</mn></mrow></math>: the blue value of the bottom-right pixel.</p>
+<p><b>Scaling to [0, 1].</b> Networks work better with small input numbers, so each value is divided by 255:</p>
+<div class="eq"><math display="block" alttext="\tilde{x}_{u,v,c} = \frac{x_{u,v,c}}{255}"><mrow><msub><mover accent="true"><mi>x</mi><mo>~</mo></mover><mrow><mi>u</mi><mo>,</mo><mi>v</mi><mo>,</mo><mi>c</mi></mrow></msub><mo>=</mo><mfrac><msub><mi>x</mi><mrow><mi>u</mi><mo>,</mo><mi>v</mi><mo>,</mo><mi>c</mi></mrow></msub><mn>255</mn></mfrac></mrow></math>
+<div class="where"><math alttext="\tilde{x}_{u,v,c}"><mrow><msub><mover accent="true"><mi>x</mi><mo>~</mo></mover><mrow><mi>u</mi><mo>,</mo><mi>v</mi><mo>,</mo><mi>c</mi></mrow></msub></mrow></math>: the scaled value, between 0 and 1 · 255: the largest possible stored value.</div>
+<div class="words"><b>In words</b>Every value becomes “what fraction of full intensity”.</div></div>
+<p>The blue-ish pixel (51, 102, 204) becomes (0.2, 0.4, 0.8). Red becomes (1, 0, 0), white (1, 1, 1) and black (0, 0, 0):</p>
+<div class="mats"><div class="mat" data-m='[[1.0, 1.0], [0.0, 0.2]]' data-t="channel 1 scaled" data-r='["row 1", "row 2"]' data-c='["col 1", "col 2"]' data-kind="seq" data-d="1" data-max="1"></div><div class="mat" data-m='[[0.0, 1.0], [0.0, 0.4]]' data-t="channel 2 scaled" data-r='["row 1", "row 2"]' data-c='["col 1", "col 2"]' data-kind="seq" data-d="1" data-max="1"></div><div class="mat" data-m='[[0.0, 1.0], [0.0, 0.8]]' data-t="channel 3 scaled" data-r='["row 1", "row 2"]' data-c='["col 1", "col 2"]' data-kind="seq" data-d="1" data-max="1"></div></div>
+<div class="call shape"><b>Shape check</b>A standard Vision Transformer input is <math alttext="224\times224"><mrow><mn>224</mn><mo>×</mo><mn>224</mn></mrow></math> pixels in color: <math alttext="224\times224\times 3"><mrow><mn>224</mn><mo>×</mo><mn>224</mn><mo>×</mo><mn>3</mn></mrow></math> = 150,528 numbers. Keep this number in mind; the next byte asks what happens if every pixel becomes a token.</div>
+<div class="call note"><b>Practical note</b>Many models go one step further and <b>standardize</b> each channel as in <a class="xref" data-xo="18" href="../transformers/#b18">§18</a>: subtract a channel mean and divide by a channel standard deviation, using fixed values computed once from a large photo collection. With the commonly used ImageNet values (means 0.485, 0.456, 0.406 and standard deviations 0.229, 0.224, 0.225 for R, G, B), the red value of the blue-ish pixel becomes <math alttext="(0.2 - 0.485)/0.229"><mrow><mo stretchy="false">(</mo><mn>0.2</mn><mo>−</mo><mn>0.485</mn><mo stretchy="false">)</mo><mo>/</mo><mn>0.229</mn></mrow></math> ≈ −1.24, and the whole pixel becomes about (−1.24, −0.25, 1.75). This is a preprocessing convention, not part of the architecture. Libraries also differ in axis order: some store <math alttext="H_{im}\times W_{im}\times C"><mrow><msub><mi>H</mi><mrow><mi>i</mi><mi>m</mi></mrow></msub><mo>×</mo><msub><mi>W</mi><mrow><mi>i</mi><mi>m</mi></mrow></msub><mo>×</mo><mi>C</mi></mrow></math>, others <math alttext="C\times H_{im}\times W_{im}"><mrow><mi>C</mi><mo>×</mo><msub><mi>H</mi><mrow><mi>i</mi><mi>m</mi></mrow></msub><mo>×</mo><msub><mi>W</mi><mrow><mi>i</mi><mi>m</mi></mrow></msub></mrow></math>. The numbers are the same, only arranged differently.</div>
+<div class="call key"><b>Key idea</b>To a Transformer, an image is just a block of <math alttext="H_{im}\cdot W_{im}\cdot C"><mrow><msub><mi>H</mi><mrow><mi>i</mi><mi>m</mi></mrow></msub><mo>⋅</mo><msub><mi>W</mi><mrow><mi>i</mi><mi>m</mi></mrow></msub><mo>⋅</mo><mi>C</mi></mrow></math> numbers. The next bytes decide how to cut that block into <b>tokens</b>.</div>
+</section>
+
+<script type="application/json" id="oldsecs">{"8": {"t": "Multi-Head Attention: Why use multiple heads?", "p": "A single attention head produces one attention distribution per token. Multi-head attention gives the model several independently learned attention mechanisms, allowing different heads to capture different relationships in parallel.", "n": "Transformers notes", "u": "../transformers/"}, "17": {"t": "From Text to Vectors: Tokens, IDs and the Embedding Table", "p": "A neural network cannot read text, so text is converted to numbers in three steps.", "n": "Transformers notes", "u": "../transformers/"}, "18": {"t": "Background: Mean, Variance and Standardization", "p": "The next block (layer normalization) needs three simple statistics of a list of numbers <math alttext=\"x_1, \\dots, x_D\"><mrow><msub><mi>x<\/mi><mn>1<\/mn><\/msub><mo>,<\/mo><mo>…<\/mo><mo>,<\/mo><msub><mi>x<\/mi><mi>D<\/mi><\/msub><\/mrow><\/math>.", "n": "Transformers notes", "u": "../transformers/"}}</script>
+<footer><a href="../">← Advanced DL</a> · <a href="../transformers/">Transformers (§1–58)</a> · <a href="../modern-transformers/">Modern Transformers (§59–93)</a> · <a href="../syllabus/">Syllabus</a><br>Equations are native MathML (rendered by the browser, no external libraries). Every number on this page is computed by code from the stated equations.</footer>
+</div></main>
+<script src="lib.js"></script>
+</body>
+</html>
