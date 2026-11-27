@@ -1,0 +1,103 @@
+/* Course index pages: course map, units on a timeline rail, lecture cards with thumbnails, hover previews.
+   Generated pages: see course-pages-build/. Each unit sets --hue. */
+.wrap.wide{max-width:860px}
+.chero{position:relative;padding:0 0 4px}
+.chero .ckick,.ukick{font:700 12px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--hue,var(--accent))}
+.chero .ckick{margin-bottom:8px}
+.chero .lede{margin-bottom:18px}
+.stats{display:flex;flex-wrap:wrap;gap:8px;font:13px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;color:var(--ink2)}
+.stats span{background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:5px 12px}
+.stats b{color:var(--ink)}
+
+/* ---------- course map ---------- */
+.map{display:grid;grid-template-columns:repeat(var(--n),1fr);position:relative;margin:6px 0 8px}
+.map::before{content:"";position:absolute;left:calc(50% / var(--n));right:calc(50% / var(--n));top:21px;height:3px;border-radius:3px;background:var(--line)}
+.stop{position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;text-decoration:none;color:var(--ink);padding:0 4px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif}
+.stop .node,.unit .rail .node{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;font:700 14px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;position:relative;z-index:1;transition:transform .15s}
+.stop.done .node,.unit.done .rail .node{background:var(--hue);color:#fff;box-shadow:0 0 0 4px var(--bg)}
+.stop.prep .node,.unit.prep .rail .node{background:var(--bg);color:var(--hue);border:2.5px dashed var(--hue);box-shadow:0 0 0 4px var(--bg)}
+.stop.todo .node,.unit.todo .rail .node{background:var(--bg);color:var(--muted);border:2px solid var(--line);box-shadow:0 0 0 4px var(--bg)}
+.stop:hover .node,.stop:focus-visible .node{transform:scale(1.08)}
+.stop .sl{margin-top:8px;font-size:13px;font-weight:650;line-height:1.25}
+.stop .sh{font-size:12px;color:var(--muted)}
+.stop.todo .sl{color:var(--muted)}
+.stop.prep .node::after{content:"";position:absolute;right:-1px;top:-1px;width:10px;height:10px;border-radius:50%;background:var(--hue);animation:pulse 1.8s ease-out infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--hue) 55%,transparent)}100%{box-shadow:0 0 0 9px transparent}}
+
+/* ---------- units on a rail ---------- */
+.units{position:relative}
+.unit{display:grid;grid-template-columns:44px 1fr;gap:0 18px;padding-bottom:34px;scroll-margin-top:16px}
+.unit .rail{position:relative;display:flex;justify-content:center}
+.unit .rail::before{content:"";position:absolute;top:44px;bottom:-0px;width:3px;border-radius:3px;background:linear-gradient(var(--hue),color-mix(in srgb,var(--hue) 15%,var(--line)))}
+.unit.todo .rail::before{background:var(--line)}
+.unit:last-child .rail::before{background:linear-gradient(var(--line),transparent)}
+.ukick{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:4px}
+.ukick .state{font-weight:600;letter-spacing:.02em;text-transform:none;font-size:11.5px;padding:1px 8px;border-radius:999px;background:color-mix(in srgb,var(--hue) 12%,#fff);color:var(--hue)}
+.unit.todo .ukick{color:var(--muted)}
+.unit.todo .ukick .state{background:var(--soft);color:var(--muted)}
+.unit h3{font-size:24px;line-height:1.2;margin:4px 0 10px;letter-spacing:-.005em}
+.unit.todo h3{color:var(--ink2)}
+
+/* ---------- topic chips ---------- */
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 16px}
+.chip{font:600 12.5px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;padding:5px 10px;border-radius:999px;text-decoration:none;cursor:default;transition:background .12s,border-color .12s}
+.chip.on{background:color-mix(in srgb,var(--hue) 11%,#fff);color:color-mix(in srgb,var(--hue) 82%,#000);border:1px solid color-mix(in srgb,var(--hue) 28%,#fff);cursor:pointer}
+.chip.on::before{content:"✓ ";opacity:.7}
+.chip.on:hover,.chip.on:focus-visible{background:var(--hue);color:#fff;border-color:var(--hue)}
+.chip.plan{color:var(--hue);border:1px dashed color-mix(in srgb,var(--hue) 55%,#fff);background:transparent}
+.chip.todo{color:var(--muted);border:1px solid var(--line);background:var(--paper)}
+
+/* ---------- lecture cards ---------- */
+.lcards{display:grid;gap:12px}
+.lcard{display:grid;grid-template-columns:168px 1fr;gap:0;background:var(--paper);border:1px solid var(--line);border-radius:14px;overflow:hidden;text-decoration:none;color:var(--ink);transition:border-color .15s,box-shadow .2s,transform .2s}
+a.lcard:hover,a.lcard:focus-visible{border-color:var(--hue);box-shadow:0 8px 26px color-mix(in srgb,var(--hue) 16%,transparent);transform:translateY(-2px);outline:none}
+.thumb{color:var(--hue);background:linear-gradient(135deg,color-mix(in srgb,var(--hue) 10%,#fff),color-mix(in srgb,var(--hue) 4%,#fff));display:grid;place-items:center;padding:12px 10px;border-right:1px solid color-mix(in srgb,var(--hue) 14%,var(--line))}
+.thumb svg{width:100%;max-width:150px;height:auto;display:block;transition:transform .3s}
+a.lcard:hover .thumb svg{transform:scale(1.05)}
+.lcard .body{padding:16px 20px 14px}
+.lcard h4{margin:0 0 4px;font:700 17.5px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif}
+.lcard p{margin:0;color:var(--ink2);font-size:15px;line-height:1.55}
+.lcard .meta{margin-top:10px;font:12.5px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;color:var(--muted);display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.lcard .tag{background:color-mix(in srgb,var(--hue) 12%,#fff);color:color-mix(in srgb,var(--hue) 85%,#000)}
+.lcard .tag.t-lab{background:var(--hue);color:#fff}
+.lcard .tag.t-soon{background:transparent;border:1px dashed var(--hue);color:var(--hue)}
+.lcard .tag.t-doc{background:var(--soft);color:var(--ink2)}
+.lcard.soon{border-style:dashed;background:color-mix(in srgb,var(--paper) 60%,transparent);cursor:help}
+.lcard.soon .thumb{filter:saturate(.55);opacity:.85;background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--hue) 6%,#fff) 0 8px,color-mix(in srgb,var(--hue) 2%,#fff) 8px 16px)}
+.lcard.soon h4{color:var(--ink2)}
+.lcard.soon:focus-visible{outline:2px solid var(--hue);outline-offset:2px}
+.empty{display:flex;align-items:center;gap:14px;border:1px dashed var(--line);border-radius:14px;padding:10px 16px 10px 10px;color:var(--muted);font-size:14.5px}
+.empty p{margin:0}
+.thumb.mini{width:92px;flex:none;border:0;border-radius:10px;padding:6px;filter:grayscale(.5);opacity:.75}
+
+/* draw-in animation on hover */
+.lcard .draw{stroke-dasharray:420;stroke-dashoffset:0}
+a.lcard:hover .draw{animation:draw 1.1s ease-out}
+@keyframes draw{from{stroke-dashoffset:420}to{stroke-dashoffset:0}}
+@media (prefers-reduced-motion:reduce){a.lcard:hover .draw,.stop.prep .node::after{animation:none}a.lcard:hover,a.lcard:hover .thumb svg{transform:none}}
+
+/* ---------- hover preview (same look as the §-link previews in the notes) ---------- */
+#xprev{position:fixed;z-index:60;background:var(--paper);border:1px solid var(--line);border-left:4px solid var(--hue,var(--accent));border-radius:10px;
+  box-shadow:0 10px 30px rgba(0,0,0,.13);padding:10px 14px 11px;font-size:14.5px;line-height:1.5;color:var(--ink);opacity:0;pointer-events:none;transform:translateY(4px);transition:opacity .12s,transform .12s;max-width:calc(100vw - 24px)}
+#xprev.on{opacity:1;pointer-events:auto;transform:none}
+#xprev .xk{font:700 11px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;letter-spacing:.07em;text-transform:uppercase;color:var(--hue,var(--accent));margin-bottom:3px}
+#xprev .xt{font:700 15.5px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;margin-bottom:5px}
+#xprev .xp{color:var(--ink2);display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
+#xprev .xl{list-style:none;margin:4px 0 0;padding:0;font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;color:var(--ink2)}
+#xprev .xl li{display:grid;grid-template-columns:28px 1fr;padding:2px 0;border-top:1px solid var(--soft)}
+#xprev .xl li span{font-weight:700;color:var(--hue,var(--accent));font-variant-numeric:tabular-nums}
+#xprev .xm{font:12.5px sans-serif;color:var(--muted);margin-top:3px;padding-left:28px}
+#xprev .xh{font:12px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--muted);margin-top:6px}
+
+@media (max-width:640px){
+  .map .sl{font-size:11.5px}.map .sh{font-size:11px}
+  .stop .node,.unit .rail .node{width:36px;height:36px;font-size:12.5px}
+  .map::before{top:17px}.unit .rail::before{top:36px}
+  .unit{grid-template-columns:36px 1fr;gap:0 12px}
+  .unit h3{font-size:20px}
+  .lcard{grid-template-columns:1fr}
+  .thumb{border-right:0;border-bottom:1px solid color-mix(in srgb,var(--hue) 14%,var(--line));padding:10px}
+  .thumb svg{max-width:170px;max-height:96px}
+  .lcard .body{padding:12px 14px}
+}
+@media print{#xprev{display:none}.lcard{break-inside:avoid}}
