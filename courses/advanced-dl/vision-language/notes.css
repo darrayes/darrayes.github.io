@@ -226,3 +226,12 @@ a.xref{text-decoration-style:dotted;text-underline-offset:3px}
 @media print{#xprev,#xback{display:none}}
 /* color swatch for pixel tables */
 .sw{display:inline-block;width:14px;height:14px;border-radius:3px;border:1px solid var(--line);vertical-align:-2px;margin-right:4px}
+/* ViT demos */
+.demo table.pm{border-collapse:collapse;font:13px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif}
+.demo table.pm th,.demo table.pm td{padding:4px 8px;border:1px solid var(--line);text-align:center;font-variant-numeric:tabular-nums}
+.demo table.pm th{background:var(--soft);font-weight:600}
+.demo table.pm tr.on th{background:var(--q-soft)}
+.demo table.pm tr.on td{outline:2px solid var(--q);outline-offset:-2px}
+.demo .ctrl button{font:600 12.5px sans-serif;padding:4px 10px;border-radius:6px;border:1px solid var(--line);background:var(--soft);color:var(--ink);cursor:pointer}
+.demo .ctrl button:hover{border-color:var(--accent)}
+.demo .ctrl.sl input[type=range]{width:110px}
