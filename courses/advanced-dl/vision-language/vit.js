@@ -292,4 +292,42 @@
     }
     nv.oninput = real.onchange = draw; draw();
   };
+  /* ---------- §119: the gate of a cross-attention layer ---------- */
+  FIG.xattnGate = el => {
+    const J = JSON.parse(el.dataset.j).xa_all, txt = ["How", "many", "dogs"];
+    el.innerHTML = `<div class="ctrl"><label>gate α <input type="range" class="al" min="-3" max="3" step="0.05" value="0"><output></output></label><button type="button" class="z">α = 0</button><button type="button" class="h">α = 0.5</button></div>
+      <div class="panel"><div class="viz"></div><div class="readout"></div></div>`;
+    const al = el.querySelector(".al"), viz = el.querySelector(".viz"), ro = el.querySelector(".readout");
+    function draw() {
+      const a = +al.value, t = Math.tanh(a); al.nextElementSibling.textContent = fmt(a, 2);
+      let h = `<div style="font:600 12px sans-serif;color:var(--ink2);margin-bottom:4px">text → image attention weights</div><table class="pm"><tr><th></th>${["v1", "v2", "v3", "v4"].map(v => `<th>${v}</th>`).join("")}</tr>`;
+      J.A.forEach((r, i) => { h += `<tr><th>${txt[i]}</th>${r.map(v => `<td style="background:${colSeq(v, 0.5)};color:${v > 0.3 ? "#fff" : C.ink}">${fmt(v, 3)}</td>`).join("")}</tr>`; });
+      viz.innerHTML = h + "</table>";
+      ro.innerHTML = `<b>tanh(α) = ${fmt(t, 4)}</b><br>` + J.U.map((u, i) => `${txt[i]}: [${u.map((v, j) => fmt(v + t * J.O[i][j], 4)).join(", ")}]`).join("<br>") +
+        `<br><span style="color:var(--muted)">${Math.abs(t) < 1e-9 ? "α = 0: the rows are exactly the LLM's own; the image has no effect." : "The image's contribution is scaled by tanh(α), at most ±1."}</span>`;
+    }
+    al.oninput = draw; el.querySelector(".z").onclick = () => { al.value = 0; draw(); }; el.querySelector(".h").onclick = () => { al.value = 0.5; draw(); };
+    draw();
+  };
+
+  /* ---------- §120: prefix versus learned queries, in tokens and attention scores ---------- */
+  FIG.resampleCost = el => {
+    el.innerHTML = `<div class="ctrl"><label>visual tokens from the ViT N <select class="n">${[64, 256, 576, 1024, 2880].map(v => `<option ${v === 576 ? "selected" : ""}>${v}</option>`).join("")}</select></label>
+      <label>learned queries N<sub>q</sub> <select class="k">${[16, 32, 64, 128].map(v => `<option ${v === 64 ? "selected" : ""}>${v}</option>`).join("")}</select></label>
+      <label>question tokens T <input type="range" class="t" min="5" max="200" step="5" value="20"><output></output></label></div>
+      <div class="panel"><div class="viz"></div><div class="readout"></div></div>`;
+    const n = el.querySelector(".n"), k = el.querySelector(".k"), t = el.querySelector(".t"), viz = el.querySelector(".viz"), ro = el.querySelector(".readout");
+    const c = x => Math.round(x).toLocaleString("en-US");
+    function draw() {
+      const N = +n.value, K = +k.value, T = +t.value; t.nextElementSibling.textContent = T;
+      const Lp = N + T, Lq = K + T, sp = Lp * (Lp + 1) / 2, sq = Lq * (Lq + 1) / 2, sr = K * N;
+      const bars = [["prefix: LLM scores", sp, C.ffn], ["learned queries: LLM scores", sq, C.q], ["learned queries: resampler scores", sr, C.v]], mx = Math.max(...bars.map(b => b[1]));
+      viz.innerHTML = svg(330, 110, bars.map((b, i) => `<text x="0" y="${18 + i * 34}" style="font-size:11px">${b[0]}</text><rect x="0" y="${23 + i * 34}" width="${Math.max(1, 320 * b[1] / mx)}" height="9" rx="2" fill="${b[2]}"/>`).join(""));
+      ro.innerHTML = `<b>Prefix (§118)</b>: LLM input ${c(Lp)} tokens → ${c(sp)} causal scores per head per layer.<br>
+        <b>Learned queries</b>: LLM input ${c(Lq)} tokens → ${c(sq)} scores per head per layer,<br>plus ${c(sr)} scores per head in each resampler layer.<br>
+        Visual tokens in the LLM: <b>${c(N)} → ${c(K)}</b> (${fmt(N / K, 1)}× fewer).<br>
+        <span style="color:var(--muted)">The LLM has many layers and the resampler few, so the LLM side dominates.</span>`;
+    }
+    n.onchange = k.onchange = t.oninput = draw; draw();
+  };
 })();
